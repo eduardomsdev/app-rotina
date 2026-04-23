@@ -9,6 +9,7 @@
  *  - Stats cards no topo (concluídos / pendentes)
  *  - FAB (botão flutuante) para adicionar novo hábito
  */
+import { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
@@ -19,11 +20,11 @@ import HabitCard from '../components/HabitCard';
 import EmptyList from '../components/EmptyList';
 
 export default function HomeScreen({ navigation }) {
-  const { habits, user, theme } = useApp();
+  const { habits, theme } = useApp();
   const colors = getTheme(theme);
 
-  const [searchText, setSearchText] = require('react').useState('');
-  const [filter, setFilter] = require('react').useState('all');
+  const [searchText, setSearchText] = useState('');
+  const [filter, setFilter] = useState('all');
 
   const stats = HabitService.getTodayStats(habits);
   const today = DateUtils.todayKey();

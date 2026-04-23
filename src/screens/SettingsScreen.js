@@ -6,12 +6,12 @@
  *
  * Funcionalidades:
  *  - Perfil do usuário logado com avatar gerado dinamicamente (componente Image)
- *  - Barra de progresso mostrando % de tarefas concluídas
+ *  - Barra de progresso mostrando % de hábitos concluídos hoje
  *  - Toggle de tema claro/escuro (Switch nativo do RN)
+ *  - Estatísticas de hábitos (total / pendentes / feitos hoje)
  *  - Informações do aplicativo
  *  - Botão de logout com confirmação
  */
-import React from 'react';
 import {
   View,
   Text,
@@ -25,13 +25,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { getTheme } from '../utils/themes';
+import { DateUtils } from '../utils/dateUtils';
 
 export default function SettingsScreen() {
-  const { user, logout, theme, toggleTheme, tasks } = useApp();
+  const { user, logout, theme, toggleTheme, habits } = useApp();
   const colors = getTheme(theme);
 
-  const completedCount = tasks.filter((t) => t.completed).length;
-  const totalCount = tasks.length;
+  const today = DateUtils.todayKey();
+  const completedCount = habits.filter((h) => h.history[today] === true).length;
+  const totalCount = habits.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const handleLogout = () => {
@@ -92,20 +94,28 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* ─── Progresso de Tarefas ─── */}
+      {/* ─── Progresso de Hábitos de Hoje ─── */}
       <View style={styles.progressCard}>
         <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>Progresso Geral</Text>
+          <Text style={styles.progressTitle}>Progresso de Hoje</Text>
           <Text style={styles.progressPercent}>{progressPercent}%</Text>
         </View>
 
-        {/* Barra de progresso animada */}
+        {/* Barra de progresso */}
         <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+          <View
+            style={[
+              styles.progressBarFill,
+              {
+                width: `${progressPercent}%`,
+                backgroundColor: progressPercent === 100 ? colors.success : colors.primary,
+              },
+            ]}
+          />
         </View>
 
         <Text style={styles.progressSubtext}>
-          {completedCount} de {totalCount} tarefas concluídas
+          {completedCount} de {totalCount} hábito{totalCount !== 1 ? 's' : ''} feito{completedCount !== 1 ? 's' : ''} hoje
         </Text>
       </View>
 
@@ -132,12 +142,12 @@ export default function SettingsScreen() {
 
       {/* ─── Estatísticas ─── */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Estatísticas</Text>
+        <Text style={styles.sectionTitle}>Estatísticas de Hoje</Text>
         <View style={styles.statsGrid}>
           {[
-            { label: 'Total', value: totalCount, icon: '📋', bg: colors.primaryLight, color: colors.primary },
+            { label: 'Total', value: totalCount, icon: '🌱', bg: colors.primaryLight, color: colors.primary },
             { label: 'Pendentes', value: totalCount - completedCount, icon: '⏳', bg: colors.warningLight, color: colors.warning },
-            { label: 'Concluídas', value: completedCount, icon: '✅', bg: colors.successLight, color: colors.success },
+            { label: 'Feitos', value: completedCount, icon: '✅', bg: colors.successLight, color: colors.success },
           ].map((stat) => (
             <View key={stat.label} style={[styles.statCard, { backgroundColor: stat.bg }]}>
               <Text style={styles.statIcon}>{stat.icon}</Text>

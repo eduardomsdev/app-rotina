@@ -1,16 +1,18 @@
 /**
- * AddTaskScreen.js — Tela 3: Adicionar Nova Tarefa
+ * AddTaskScreen.js — Tela "Novo Hábito" (rota: AddHabit).
  *
- * Componentes utilizados: View, Text, TextInput, Button (nativo RN), TouchableOpacity
- * Layout Flexbox: coluna, card centralizado com padding
+ * Campos:
+ *  - Nome do hábito (TextInput, obrigatório, máx 80 chars)
+ *  - Descrição (TextInput multiline, opcional, máx 300 chars)
+ *  - Seletor de ícone (grid de emojis)
+ *  - Seletor de cor (linha de círculos coloridos)
  *
- * Funcionalidades:
- *  - Campos para título e descrição com contador de caracteres
- *  - Seleção de prioridade (baixa / média / alta)
- *  - Botão "Limpar Campos" usando o componente nativo Button do React Native
- *  - Validação antes de salvar
+ * Segurança:
+ *  - Validação e sanitização feitas no AppContext via security.js
+ *  - Limites de caracteres aplicados no TextInput (maxLength)
+ *  - Button nativo do React Native para "Limpar Campos" (requisito acadêmico)
  */
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -21,46 +23,65 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Button, // ← Componente Button nativo do React Native (requisito acadêmico)
+  Button,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { getTheme } from '../utils/themes';
 
-// Configurações dos níveis de prioridade para o seletor visual
-const PRIORITIES = [
-  { value: 'low', label: 'Baixa', icon: '🟢', color: '#4CAF50', desc: 'Pode esperar' },
-  { value: 'medium', label: 'Média', icon: '🟡', color: '#FF9800', desc: 'Importante' },
-  { value: 'high', label: 'Alta', icon: '🔴', color: '#FF5252', desc: 'Urgente' },
+// Ícones disponíveis para o hábito
+const HABIT_ICONS = [
+  '💧', '🏃', '📚', '🧘', '😴', '🥗',
+  '💻', '✍️', '🎵', '🌿', '💊', '🙏',
+  '🏋️', '🚴', '🎨', '🍎', '☕', '🧹',
+  '📝', '🎯', '🛁', '🧠', '🌅', '❤️',
+];
+
+// Cores disponíveis para o hábito
+const HABIT_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+  '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE',
+  '#85C1E9', '#FFB347', '#87CEEB', '#6C63FF',
 ];
 
 export default function AddTaskScreen({ navigation }) {
-  const { addTask, theme } = useApp();
+  const { addHabit, theme } = useApp();
   const colors = getTheme(theme);
 
-  const [title, setTitle] = useState('');
+  const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('medium');
+  const [selectedIcon, setSelectedIcon] = useState('💧');
+  const [selectedColor, setSelectedColor] = useState('#45B7D1');
   const [loading, setLoading] = useState(false);
 
-  // Limpa todos os campos do formulário
   const handleClear = () => {
-    setTitle('');
+    setName('');
     setDescription('');
-    setPriority('medium');
+    setSelectedIcon('💧');
+    setSelectedColor('#45B7D1');
   };
 
   const handleSave = async () => {
-    if (!title.trim()) {
-      Alert.alert('Campo obrigatório', 'Informe um título para a tarefa.');
+    if (!name.trim()) {
+      Alert.alert('Campo obrigatório', 'Informe um nome para o hábito.');
       return;
     }
 
     setLoading(true);
-    await addTask({ title: title.trim(), description: description.trim(), priority });
+    const result = await addHabit({
+      name: name.trim(),
+      description: description.trim(),
+      icon: selectedIcon,
+      color: selectedColor,
+    });
     setLoading(false);
 
-    Alert.alert('✅ Tarefa criada!', 'Sua tarefa foi adicionada com sucesso.', [
+    if (!result.success) {
+      Alert.alert('Erro', result.message);
+      return;
+    }
+
+    Alert.alert('✅ Hábito criado!', `"${name.trim()}" foi adicionado à sua rotina.`, [
       { text: 'OK', onPress: () => navigation.goBack() },
     ]);
   };
@@ -78,19 +99,34 @@ export default function AddTaskScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.formCard}>
-          {/* ─── Campo Título (TextInput) ─── */}
+          {/* ─── Preview do hábito ─── */}
+          <View style={[styles.preview, { backgroundColor: selectedColor + '18', borderColor: selectedColor + '40' }]}>
+            <View style={[styles.previewIcon, { backgroundColor: selectedColor + '30' }]}>
+              <Text style={styles.previewEmoji}>{selectedIcon}</Text>
+            </View>
+            <View style={styles.previewText}>
+              <Text style={[styles.previewName, { color: selectedColor }]} numberOfLines={1}>
+                {name || 'Nome do hábito'}
+              </Text>
+              <Text style={styles.previewDesc} numberOfLines={1}>
+                {description || 'Descrição opcional'}
+              </Text>
+            </View>
+          </View>
+
+          {/* ─── Campo Nome (TextInput) ─── */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Título *</Text>
+            <Text style={styles.sectionLabel}>Nome do Hábito *</Text>
             <TextInput
               style={styles.input}
-              placeholder="O que precisa ser feito?"
+              placeholder="Ex: Beber 2L de água"
               placeholderTextColor={colors.placeholder}
-              value={title}
-              onChangeText={setTitle}
+              value={name}
+              onChangeText={setName}
               maxLength={80}
               returnKeyType="next"
             />
-            <Text style={styles.charCount}>{title.length}/80</Text>
+            <Text style={styles.charCount}>{name.length}/80</Text>
           </View>
 
           {/* ─── Campo Descrição (TextInput multiline) ─── */}
@@ -98,56 +134,68 @@ export default function AddTaskScreen({ navigation }) {
             <Text style={styles.sectionLabel}>Descrição</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Detalhes sobre a tarefa (opcional)..."
+              placeholder="Detalhes sobre o hábito (opcional)..."
               placeholderTextColor={colors.placeholder}
               value={description}
               onChangeText={setDescription}
               multiline
-              numberOfLines={4}
+              numberOfLines={3}
               textAlignVertical="top"
               maxLength={300}
             />
             <Text style={styles.charCount}>{description.length}/300</Text>
           </View>
 
-          {/* ─── Seletor de Prioridade ─── */}
+          {/* ─── Seletor de Ícone ─── */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Prioridade</Text>
-            <View style={styles.priorityRow}>
-              {PRIORITIES.map((p) => {
-                const isSelected = priority === p.value;
-                return (
-                  <TouchableOpacity
-                    key={p.value}
-                    style={[
-                      styles.priorityOption,
-                      isSelected && {
-                        borderColor: p.color,
-                        backgroundColor: p.color + '18',
-                      },
-                    ]}
-                    onPress={() => setPriority(p.value)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.priorityIcon}>{p.icon}</Text>
-                    <Text
-                      style={[
-                        styles.priorityLabel,
-                        isSelected && { color: p.color, fontWeight: '700' },
-                      ]}
-                    >
-                      {p.label}
-                    </Text>
-                    <Text style={styles.priorityDesc}>{p.desc}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <Text style={styles.sectionLabel}>Ícone</Text>
+            <View style={styles.iconGrid}>
+              {HABIT_ICONS.map((icon) => (
+                <TouchableOpacity
+                  key={icon}
+                  style={[
+                    styles.iconOption,
+                    selectedIcon === icon && {
+                      backgroundColor: selectedColor + '25',
+                      borderColor: selectedColor,
+                    },
+                  ]}
+                  onPress={() => setSelectedIcon(icon)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.iconEmoji}>{icon}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
-          {/* ─── Botão nativo Button do React Native ─── */}
-          {/* Usado aqui para demonstrar o componente Button (requisito do projeto) */}
-          <View style={styles.clearButtonWrapper}>
+          {/* ─── Seletor de Cor ─── */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Cor</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.colorRow}>
+                {HABIT_COLORS.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.colorCircle,
+                      { backgroundColor: color },
+                      selectedColor === color && styles.colorCircleSelected,
+                    ]}
+                    onPress={() => setSelectedColor(color)}
+                    activeOpacity={0.8}
+                  >
+                    {selectedColor === color && (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* ─── Botão nativo Button (requisito acadêmico) ─── */}
+          <View style={styles.clearWrapper}>
             <Button
               title="🗑  Limpar Campos"
               onPress={handleClear}
@@ -167,14 +215,14 @@ export default function AddTaskScreen({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.saveButton, loading && styles.buttonDisabled]}
+            style={[styles.saveButton, { backgroundColor: selectedColor }, loading && styles.buttonDisabled]}
             onPress={handleSave}
             disabled={loading}
             activeOpacity={0.8}
           >
             <Ionicons name="checkmark-circle-outline" size={18} color="#FFF" />
             <Text style={styles.saveButtonText}>
-              {loading ? 'Salvando...' : 'Salvar Tarefa'}
+              {loading ? 'Salvando...' : 'Criar Hábito'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -185,13 +233,8 @@ export default function AddTaskScreen({ navigation }) {
 
 const createStyles = (colors) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContent: {
-      padding: 16,
-    },
+    container: { flex: 1, backgroundColor: colors.background },
+    scrollContent: { padding: 16 },
     formCard: {
       backgroundColor: colors.card,
       borderRadius: 20,
@@ -202,9 +245,29 @@ const createStyles = (colors) =>
       shadowRadius: 10,
       elevation: 4,
     },
-    section: {
+    // ─── Preview ───
+    preview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 14,
+      padding: 14,
       marginBottom: 20,
+      borderWidth: 1,
+      gap: 12,
     },
+    previewIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    previewEmoji: { fontSize: 26 },
+    previewText: { flex: 1 },
+    previewName: { fontSize: 16, fontWeight: '700' },
+    previewDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    // ─── Campos ───
+    section: { marginBottom: 20 },
     sectionLabel: {
       fontSize: 12,
       fontWeight: '700',
@@ -222,53 +285,46 @@ const createStyles = (colors) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    textArea: {
-      height: 110,
-      paddingTop: 14,
-    },
-    charCount: {
-      fontSize: 11,
-      color: colors.textSecondary,
-      textAlign: 'right',
-      marginTop: 4,
-    },
-    // ─── Prioridade ───
-    priorityRow: {
+    textArea: { height: 90, paddingTop: 14 },
+    charCount: { fontSize: 11, color: colors.textSecondary, textAlign: 'right', marginTop: 4 },
+    // ─── Grid de ícones ───
+    iconGrid: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 8,
     },
-    priorityOption: {
-      flex: 1,
+    iconOption: {
+      width: 46,
+      height: 46,
       borderRadius: 12,
-      padding: 12,
+      justifyContent: 'center',
       alignItems: 'center',
+      backgroundColor: colors.inputBg,
       borderWidth: 2,
       borderColor: colors.border,
-      backgroundColor: colors.inputBg,
     },
-    priorityIcon: {
-      fontSize: 22,
-      marginBottom: 4,
+    iconEmoji: { fontSize: 22 },
+    // ─── Seletor de cor ───
+    colorRow: { flexDirection: 'row', gap: 10, paddingVertical: 4 },
+    colorCircle: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
-    priorityLabel: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      fontWeight: '500',
+    colorCircleSelected: {
+      borderWidth: 3,
+      borderColor: '#FFFFFF',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 4,
     },
-    priorityDesc: {
-      fontSize: 10,
-      color: colors.textSecondary,
-      marginTop: 2,
-    },
-    clearButtonWrapper: {
-      marginTop: 4,
-    },
-    // ─── Botões de ação ───
-    buttonRow: {
-      flexDirection: 'row',
-      gap: 12,
-      marginTop: 16,
-    },
+    clearWrapper: { marginTop: 4 },
+    // ─── Botões ───
+    buttonRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
     cancelButton: {
       flex: 1,
       padding: 16,
@@ -277,11 +333,7 @@ const createStyles = (colors) =>
       borderWidth: 2,
       borderColor: colors.border,
     },
-    cancelButtonText: {
-      color: colors.textSecondary,
-      fontSize: 15,
-      fontWeight: '600',
-    },
+    cancelButtonText: { color: colors.textSecondary, fontSize: 15, fontWeight: '600' },
     saveButton: {
       flex: 2,
       flexDirection: 'row',
@@ -290,19 +342,11 @@ const createStyles = (colors) =>
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      backgroundColor: colors.primary,
-      shadowColor: colors.primary,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.35,
       shadowRadius: 8,
       elevation: 5,
     },
-    buttonDisabled: {
-      opacity: 0.7,
-    },
-    saveButtonText: {
-      color: '#FFFFFF',
-      fontSize: 15,
-      fontWeight: 'bold',
-    },
+    buttonDisabled: { opacity: 0.7 },
+    saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
   });

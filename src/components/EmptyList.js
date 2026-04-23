@@ -1,13 +1,12 @@
 /**
- * EmptyList.js — Componente exibido quando a FlatList não tem itens.
+ * EmptyList.js — Componente exibido quando a FlatList não tem hábitos.
  *
  * Adapta a mensagem conforme o contexto:
- *  - busca ativa → "Nenhum resultado"
- *  - filtro "completed" → "Nenhuma tarefa concluída"
- *  - filtro "pending" + lista vazia → "Tudo em dia!"
- *  - lista vazia geral → instrução para criar a primeira tarefa
+ *  - busca ativa → "Nenhum resultado para '...'"
+ *  - filtro "completed" → "Nenhum hábito concluído hoje"
+ *  - filtro "pending" → "Todos os hábitos feitos hoje! 🎉"
+ *  - lista vazia geral → instrução para criar o primeiro hábito
  */
-import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { getTheme } from '../utils/themes';
@@ -21,27 +20,27 @@ export default function EmptyList({ searchText, filter }) {
       return {
         icon: '🔍',
         title: 'Nenhum resultado',
-        subtitle: `Não encontramos tarefas para "${searchText}"`,
+        subtitle: `Não encontramos hábitos para "${searchText}"`,
       };
     }
     if (filter === 'completed') {
       return {
         icon: '🎯',
-        title: 'Nenhuma tarefa concluída',
-        subtitle: 'Complete suas tarefas e elas aparecerão aqui.',
+        title: 'Nenhum hábito concluído hoje',
+        subtitle: 'Marque seus hábitos como feitos e eles aparecerão aqui.',
       };
     }
     if (filter === 'pending') {
       return {
         icon: '🎉',
-        title: 'Tudo em dia!',
-        subtitle: 'Todas as suas tarefas foram concluídas. Parabéns!',
+        title: 'Missão cumprida!',
+        subtitle: 'Todos os hábitos de hoje foram concluídos. Incrível!',
       };
     }
     return {
-      icon: '📋',
-      title: 'Nenhuma tarefa ainda',
-      subtitle: 'Toque no botão + para criar sua primeira tarefa.',
+      icon: '🌱',
+      title: 'Nenhum hábito ainda',
+      subtitle: 'Toque no + para criar seu primeiro hábito e começar sua jornada.',
     };
   };
 
