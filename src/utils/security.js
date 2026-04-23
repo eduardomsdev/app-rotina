@@ -1,34 +1,37 @@
 /**
- * security.js — Utilitários de segurança do aplicativo.
+ * security.js — Funções de segurança e validação de inputs.
  *
- * Boas práticas implementadas:
- *  1. Sanitização de inputs: remove HTML/scripts maliciosos antes de salvar
- *  2. Validação de email com regex robusto
- *  3. Validação de senha com requisito mínimo de tamanho
- *  4. Limite de comprimento em todos os campos de texto
- *  5. Nunca logar dados sensíveis em produção (__DEV__ guard)
- *  6. Dados sensíveis (senha) nunca são salvos no AsyncStorage
+ * Aprendi em aula que não devemos confiar nos dados que o usuário digita.
+ * Então criei esse arquivo para centralizar todas as validações e sanitizações
+ * do app, seguindo algumas boas práticas de segurança mobile:
  *
- * NOTA sobre AsyncStorage:
- *  O AsyncStorage armazena dados em plaintext no dispositivo.
- *  Para dados realmente sensíveis (tokens JWT, senhas), use expo-secure-store
- *  que utiliza o Keychain (iOS) / Keystore (Android) do sistema operacional.
- *  Neste app, o AsyncStorage é usado apenas para dados não-sensíveis:
- *  nome, email e preferências de tema.
+ * 1. Sanitização de texto: remove tags HTML antes de salvar qualquer string
+ * 2. Validação de email: regex que rejeita formatos inválidos
+ * 3. Validação de senha: mínimo de 6 caracteres
+ * 4. Limite de tamanho em todos os campos de texto livre
+ * 5. Nunca logar dados sensíveis em produção
+ * 6. Senhas nunca vão para o AsyncStorage — só nome e email
+ *
+ * Nota sobre o AsyncStorage: ele guarda dados em texto simples no aparelho.
+ * Em um app real de produção, dados sensíveis como tokens deveriam usar o
+ * expo-secure-store, que utiliza o Keychain do iOS e o Keystore do Android.
+ * Para os fins desse trabalho acadêmico, o AsyncStorage é suficiente.
  */
 
 export const Security = {
+
   /**
-   * Sanitiza uma string removendo tags HTML e caracteres perigosos.
-   * Previne que dados maliciosos sejam armazenados e re-exibidos.
+   * Remove tags HTML e caracteres perigosos de uma string.
+   * Isso impede que alguém salve um script ou HTML no nome do hábito,
+   * por exemplo, e esse conteúdo seja re-exibido de forma perigosa.
    */
   sanitize(input) {
     if (typeof input !== 'string') return '';
     return input
       .trim()
-      // Remove todas as tags HTML (ex: <script>alert(1)</script>)
+      // Tira tudo que parece uma tag HTML, tipo <b>, <script>, etc.
       .replace(/<[^>]*>/g, '')
-      // Escapa caracteres especiais que podem ser usados em ataques
+      // Escapa os caracteres especiais mais comuns em ataques web
       .replace(/[<>&"']/g, (char) => ({
         '<': '&lt;',
         '>': '&gt;',
@@ -36,13 +39,13 @@ export const Security = {
         '"': '&quot;',
         "'": '&#39;',
       }[char] || char))
-      // Limita o tamanho máximo para evitar payloads excessivamente grandes
+      // Limita o tamanho máximo da string para evitar dados gigantes
       .slice(0, 500);
   },
 
   /**
-   * Valida formato de email com regex.
-   * Rejeita strings vazias, sem @ ou sem domínio válido.
+   * Verifica se o email tem um formato válido usando expressão regular.
+   * A regex exige: usuario@dominio.extensao (mínimo 2 letras na extensão).
    */
   validateEmail(email) {
     if (!email || typeof email !== 'string') return false;
@@ -51,9 +54,9 @@ export const Security = {
   },
 
   /**
-   * Valida força da senha:
-   *  - Mínimo 6 caracteres
-   *  - Máximo 128 (previne ataques de DoS por hash de senhas longas)
+   * Valida a senha — mínimo 6, máximo 128 caracteres.
+   * O limite de 128 existe para evitar senhas absurdamente longas que
+   * poderiam travar o processo de hash em servidores reais.
    */
   validatePassword(password) {
     if (!password || password.length < 6) {
@@ -66,8 +69,8 @@ export const Security = {
   },
 
   /**
-   * Valida e sanitiza nome de usuário.
-   * Mínimo 2, máximo 60 caracteres.
+   * Valida e sanitiza o nome do usuário.
+   * Mínimo 2, máximo 60 caracteres — após remover espaços e HTML.
    */
   validateName(name) {
     const sanitized = this.sanitize(name);
@@ -81,8 +84,8 @@ export const Security = {
   },
 
   /**
-   * Valida e sanitiza nome de hábito.
-   * Máximo 80 caracteres (limite razoável para um título).
+   * Valida e sanitiza o nome do hábito (máximo 80 caracteres).
+   * 80 caracteres é suficiente para qualquer título de hábito.
    */
   validateHabitName(name) {
     const sanitized = this.sanitize(name);
@@ -96,39 +99,42 @@ export const Security = {
   },
 
   /**
-   * Sanitiza descrição com limite maior (300 chars).
+   * Sanitiza e limita a descrição do hábito a 300 caracteres.
    */
   sanitizeDescription(text) {
     return this.sanitize(text || '').slice(0, 300);
   },
 
   /**
-   * Log seguro: nunca exibe senhas ou tokens em produção.
-   * Em desenvolvimento (__DEV__), mostra os dados mascarando campos sensíveis.
+   * Log seguro para desenvolvimento.
+   * Só exibe no console em modo dev (__DEV__ = true quando rodando com Expo).
+   * Mascara campos sensíveis para não aparecerem acidentalmente nos logs.
    */
   safeLog(data) {
     if (__DEV__) {
       const safe = { ...data };
-      // Mascarar campos sensíveis antes de logar
+      // Substitui valores sensíveis por [REDACTED] antes de logar
       if (safe.password) safe.password = '[REDACTED]';
       if (safe.token) safe.token = '[REDACTED]';
       if (safe.secret) safe.secret = '[REDACTED]';
       console.log('[AppRotina Debug]', safe);
     }
-    // Em produção: não logar nada (evita leakage de dados no console)
+    // Em produção não loga nada — evita vazar dados no console
   },
 
   /**
-   * Valida se um valor hex de cor é seguro para uso em estilos.
-   * Previne que strings maliciosas sejam passadas para backgroundColor.
+   * Verifica se uma cor hex é válida antes de aplicar em estilos.
+   * Aceita formato curto (#FFF) e longo (#FFFFFF).
+   * Isso evita que uma string malformada quebre o layout do app.
    */
   isValidHexColor(color) {
     return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(color || '');
   },
 
   /**
-   * Valida se um emoji é uma string simples (para o ícone do hábito).
-   * Limita a 10 caracteres para evitar strings unicode excessivamente longas.
+   * Verifica se o emoji do ícone é uma string simples e curta.
+   * Limito a 10 caracteres porque emojis compostos (flags, família) podem
+   * ter múltiplos code points mas ainda assim são curtos.
    */
   isValidIcon(icon) {
     return typeof icon === 'string' && icon.length > 0 && icon.length <= 10;

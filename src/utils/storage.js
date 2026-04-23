@@ -1,13 +1,21 @@
 /**
- * storage.js — Utilitário para o AsyncStorage.
+ * storage.js — Utilitário para facilitar o uso do AsyncStorage.
  *
- * Abstrai a serialização/deserialização JSON e o tratamento de erros,
- * para que o AppContext não precise lidar com esses detalhes.
+ * O AsyncStorage só trabalha com strings, então precisei criar esse
+ * arquivo para fazer a conversão JSON automaticamente em todo o app.
+ *
+ * Também centralizei o tratamento de erros aqui para não precisar
+ * repetir o try/catch em cada lugar que salva ou lê dados.
+ *
+ * IMPORTANTE: o AsyncStorage guarda dados em plaintext no dispositivo.
+ * Por isso, nunca salvo senhas aqui — só dados não sensíveis como
+ * nome, email e preferências de tema.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const Storage = {
-  // Salva qualquer valor convertendo para JSON
+
+  // Salva qualquer valor convertendo para JSON antes
   async set(key, value) {
     try {
       await AsyncStorage.setItem(key, JSON.stringify(value));
@@ -18,7 +26,8 @@ export const Storage = {
     }
   },
 
-  // Lê e converte de JSON automaticamente; retorna null se não existir
+  // Lê um valor e já converte de JSON para objeto/array automaticamente
+  // Retorna null se a chave não existir (nunca lança exceção)
   async get(key) {
     try {
       const value = await AsyncStorage.getItem(key);
@@ -29,7 +38,7 @@ export const Storage = {
     }
   },
 
-  // Remove um item do storage
+  // Remove um item específico do storage
   async remove(key) {
     try {
       await AsyncStorage.removeItem(key);
@@ -40,7 +49,7 @@ export const Storage = {
     }
   },
 
-  // Apaga todos os dados do storage (usar com cuidado)
+  // Apaga TUDO do storage — uso só no logout completo, com cuidado
   async clear() {
     try {
       await AsyncStorage.clear();

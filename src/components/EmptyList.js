@@ -1,11 +1,18 @@
 /**
- * EmptyList.js — Componente exibido quando a FlatList não tem hábitos.
+ * EmptyList.js — Componente exibido quando a FlatList não tem hábitos para mostrar.
  *
- * Adapta a mensagem conforme o contexto:
- *  - busca ativa → "Nenhum resultado para '...'"
- *  - filtro "completed" → "Nenhum hábito concluído hoje"
- *  - filtro "pending" → "Todos os hábitos feitos hoje! 🎉"
- *  - lista vazia geral → instrução para criar o primeiro hábito
+ * Em vez de mostrar uma lista vazia sem explicação, esse componente exibe
+ * uma mensagem amigável e contextual dependendo do motivo da lista estar vazia.
+ *
+ * Há três situações possíveis:
+ *  1. O usuário pesquisou algo que não existe → "Nenhum resultado para '...'"
+ *  2. Filtro 'concluídos' ativo mas nenhum feito → "Nenhum hábito concluído hoje"
+ *  3. Filtro 'pendentes' ativo mas todos feitos → "Missão cumprida! 🎉"
+ *  4. Lista realmente vazia → "Nenhum hábito ainda. Toque no + para criar."
+ *
+ * Esse componente é passado na prop ListEmptyComponent da FlatList.
+ *
+ * Componentes RN utilizados: View, Text
  */
 import { View, Text, StyleSheet } from 'react-native';
 import { useApp } from '../context/AppContext';
@@ -15,8 +22,10 @@ export default function EmptyList({ searchText, filter }) {
   const { theme } = useApp();
   const colors = getTheme(theme);
 
+  // Define o ícone, título e subtítulo conforme o contexto atual da lista
   const getMessage = () => {
     if (searchText) {
+      // Usuário está buscando algo que não existe
       return {
         icon: '🔍',
         title: 'Nenhum resultado',
@@ -24,6 +33,7 @@ export default function EmptyList({ searchText, filter }) {
       };
     }
     if (filter === 'completed') {
+      // Filtro de concluídos ativo, mas nenhum foi feito hoje
       return {
         icon: '🎯',
         title: 'Nenhum hábito concluído hoje',
@@ -31,12 +41,14 @@ export default function EmptyList({ searchText, filter }) {
       };
     }
     if (filter === 'pending') {
+      // Filtro de pendentes ativo, mas todos já foram feitos — ótimo!
       return {
         icon: '🎉',
         title: 'Missão cumprida!',
         subtitle: 'Todos os hábitos de hoje foram concluídos. Incrível!',
       };
     }
+    // Lista completamente vazia — usuário ainda não criou nenhum hábito
     return {
       icon: '🌱',
       title: 'Nenhum hábito ainda',

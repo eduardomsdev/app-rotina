@@ -1,33 +1,38 @@
 /**
- * themes.js — Paletas de cores para os temas claro e escuro.
+ * themes.js — Paletas de cores para o tema claro e escuro.
  *
- * Cada tela importa `getTheme(theme)` e usa `colors.xxx` para estilizar
- * os componentes dinamicamente conforme a preferência do usuário.
+ * Criei esse arquivo separado para centralizar todas as cores do app.
+ * Assim, quando quero mudar uma cor, altero em um só lugar e afeta tudo.
+ *
+ * Cada tela chama getTheme(theme) e usa o objeto 'colors' para estilizar
+ * os componentes — isso permite a troca de tema em tempo real sem recarregar.
  */
 
+// Tema Claro — fundo azulado suave, destaque roxo
 export const lightTheme = {
-  background: '#F0F4FF',
-  card: '#FFFFFF',
-  primary: '#6C63FF',
-  primaryLight: '#EDE9FF',
+  background: '#F0F4FF',   // fundo da tela
+  card: '#FFFFFF',          // fundo dos cards e formulários
+  primary: '#6C63FF',       // cor principal (botões, destaques)
+  primaryLight: '#EDE9FF',  // versão clara da cor principal (badges, fundos)
   secondary: '#FF6584',
-  text: '#1A1A2E',
-  textSecondary: '#666680',
-  border: '#E0E0F0',
+  text: '#1A1A2E',          // texto principal
+  textSecondary: '#666680', // textos de legenda, subtítulos
+  border: '#E0E0F0',        // bordas de inputs e divisores
   success: '#4CAF50',
   successLight: '#E8F5E9',
   danger: '#FF5252',
   dangerLight: '#FFEBEE',
   warning: '#FF9800',
   warningLight: '#FFF3E0',
-  tabBar: '#FFFFFF',
-  headerBg: '#6C63FF',
+  tabBar: '#FFFFFF',         // fundo da barra de abas
+  headerBg: '#6C63FF',       // fundo do cabeçalho de navegação
   headerText: '#FFFFFF',
-  inputBg: '#F5F5FF',
-  placeholder: '#AAAACC',
+  inputBg: '#F5F5FF',        // fundo dos TextInput
+  placeholder: '#AAAACC',    // cor do placeholder dos inputs
   shadow: '#6C63FF',
 };
 
+// Tema Escuro — fundo escuro, mantém o roxo como cor principal
 export const darkTheme = {
   background: '#0F0F1A',
   card: '#1E1E30',
@@ -51,5 +56,5 @@ export const darkTheme = {
   shadow: '#000000',
 };
 
-// Retorna o objeto de cores com base no modo atual ('light' | 'dark')
+// Função auxiliar que retorna o tema correto baseado na preferência salva
 export const getTheme = (mode) => (mode === 'dark' ? darkTheme : lightTheme);

@@ -1,15 +1,24 @@
 /**
- * TaskDetailScreen.js — Tela "Detalhes do Hábito" (rota: HabitDetail).
+ * TaskDetailScreen.js — Tela 6: Detalhes e edição de um hábito (rota: HabitDetail).
  *
- * Exibe:
- *  - Cabeçalho colorido com ícone, nome e streak atual
- *  - Calendário dos últimos 21 dias (3 semanas em grid 7×3)
- *  - Taxa de conclusão dos últimos 30 dias
- *  - Modo de edição: altera nome, descrição, ícone e cor
- *  - Botão de excluir com confirmação
+ * Essa tela tem dois modos:
+ *  - Modo visualização: exibe todas as informações do hábito
+ *  - Modo edição: ativa ao tocar no ícone de lápis no cabeçalho
  *
- * Segurança: atualização passa pelo updateHabit() do contexto,
- * que sanitiza e valida todos os campos antes de persistir.
+ * O que a tela mostra:
+ *  1. Cabeçalho colorido com ícone, nome e chips de estatísticas
+ *     (streak atual / taxa de conclusão / maior streak)
+ *  2. Botão para marcar/desmarcar o hábito como feito hoje
+ *  3. Calendário dos últimos 21 dias (3 semanas em grid 7×3)
+ *     — células coloridas = dias feitos, cinza = dias não feitos
+ *  4. Campos de detalhes (nome e descrição)
+ *  5. Seletores de ícone e cor (só visíveis no modo edição)
+ *  6. Botão de excluir hábito com confirmação
+ *
+ * Componentes RN utilizados: View, Text, TextInput, TouchableOpacity, ScrollView
+ *
+ * Segurança: ao salvar, os dados passam pelo updateHabit() do AppContext,
+ * que valida e sanitiza tudo via security.js antes de persistir.
  */
 import { useState, useEffect } from 'react';
 import {
@@ -27,6 +36,7 @@ import { getTheme } from '../utils/themes';
 import { HabitService } from '../services/habitService';
 import { DateUtils } from '../utils/dateUtils';
 
+// Mesmos ícones e cores disponíveis na tela de criação
 const HABIT_ICONS = [
   '💧', '🏃', '📚', '🧘', '😴', '🥗',
   '💻', '✍️', '🎵', '🌿', '💊', '🙏',
@@ -41,24 +51,31 @@ const HABIT_COLORS = [
 ];
 
 export default function TaskDetailScreen({ route, navigation }) {
-  const { habitId } = route.params;
+  const { habitId } = route.params; // recebe o ID do hábito via parâmetro de rota
   const { habits, updateHabit, deleteHabit, toggleHabitToday, theme } = useApp();
   const colors = getTheme(theme);
 
+  // Busca o hábito pelo ID na lista do contexto
   const habit = habits.find((h) => h.id === habitId);
 
+  // Estados do modo de edição
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(habit?.name || '');
   const [description, setDescription] = useState(habit?.description || '');
   const [icon, setIcon] = useState(habit?.icon || '📋');
   const [selectedColor, setSelectedColor] = useState(habit?.color || '#6C63FF');
 
-  // Botão de editar/cancelar no cabeçalho
+  /**
+   * Adiciona o botão de editar/cancelar no cabeçalho da tela dinamicamente.
+   * Usei useEffect com dependências [editing, habit, colors.headerText] para
+   * atualizar o botão sempre que esses valores mudam.
+   */
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
         <TouchableOpacity
           onPress={() => {
+            // Se estava editando e vai cancelar: restaura os valores originais
             if (editing) {
               setName(habit?.name || '');
               setDescription(habit?.description || '');
@@ -79,6 +96,7 @@ export default function TaskDetailScreen({ route, navigation }) {
     });
   }, [editing, habit, colors.headerText]);
 
+  // Caso o hábito tenha sido excluído enquanto a tela estava aberta
   if (!habit) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
@@ -87,13 +105,14 @@ export default function TaskDetailScreen({ route, navigation }) {
     );
   }
 
+  // Calcula todos os dados de exibição via HabitService
   const isCompletedToday = HabitService.isCompletedToday(habit);
   const streak = HabitService.calculateStreak(habit.history);
   const longestStreak = HabitService.calculateLongestStreak(habit.history);
   const completionRate = HabitService.getCompletionRate(habit.history);
   const historyDays = HabitService.getHistoryDays(habit.history, 21); // últimos 21 dias
 
-  // Divide em 3 semanas (rows de 7)
+  // Divide os 21 dias em 3 semanas de 7 dias para o grid do calendário
   const weeks = [historyDays.slice(0, 7), historyDays.slice(7, 14), historyDays.slice(14, 21)];
 
   const handleSave = async () => {
@@ -116,6 +135,7 @@ export default function TaskDetailScreen({ route, navigation }) {
   };
 
   const handleDelete = () => {
+    // Confirmação antes de excluir — ação irreversível
     Alert.alert(
       'Excluir Hábito',
       `Excluir "${habit.name}" permanentemente? Todo o histórico será perdido.`,
@@ -134,6 +154,7 @@ export default function TaskDetailScreen({ route, navigation }) {
   };
 
   const styles = createStyles(colors);
+  // Em modo edição, o cabeçalho usa a cor selecionada no picker
   const accentColor = editing ? selectedColor : habit.color;
 
   return (
@@ -142,15 +163,17 @@ export default function TaskDetailScreen({ route, navigation }) {
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      {/* ─── Cabeçalho colorido com ícone e stats ─── */}
+      {/* ─── Cabeçalho colorido com ícone e estatísticas ─── */}
       <View style={[styles.habitHeader, { backgroundColor: accentColor + '18', borderColor: accentColor + '40' }]}>
         <View style={[styles.habitIconBox, { backgroundColor: accentColor + '30' }]}>
+          {/* Em modo edição, mostra o ícone selecionado; senão mostra o original */}
           <Text style={styles.habitIcon}>{editing ? icon : habit.icon}</Text>
         </View>
         <View style={styles.habitHeaderInfo}>
           <Text style={[styles.habitName, { color: accentColor }]} numberOfLines={2}>
             {editing ? (name || 'Nome do hábito') : habit.name}
           </Text>
+          {/* Chips com as principais estatísticas do hábito */}
           <View style={styles.statsRow}>
             <View style={styles.statChip}>
               <Text style={styles.statChipText}>🔥 {streak} {streak === 1 ? 'dia' : 'dias'}</Text>
@@ -165,7 +188,8 @@ export default function TaskDetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      {/* ─── Botão de marcar hoje ─── */}
+      {/* ─── Botão de marcar como feito hoje ─── */}
+      {/* Muda de visual conforme o estado: preenchido = feito, vazio = não feito */}
       <TouchableOpacity
         style={[styles.todayButton, { borderColor: accentColor, backgroundColor: isCompletedToday ? accentColor : 'transparent' }]}
         onPress={() => toggleHabitToday(habitId)}
@@ -181,7 +205,7 @@ export default function TaskDetailScreen({ route, navigation }) {
         </Text>
       </TouchableOpacity>
 
-      {/* ─── Calendário de histórico (21 dias) ─── */}
+      {/* ─── Calendário de histórico (grid 7×3 = 21 dias) ─── */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Histórico — últimas 3 semanas</Text>
         {weeks.map((week, wIdx) => (
@@ -192,6 +216,7 @@ export default function TaskDetailScreen({ route, navigation }) {
                 style={[
                   styles.calendarDot,
                   {
+                    // Colorido = feito, cinza = não feito, borda = hoje
                     backgroundColor: day.completed ? accentColor : colors.border,
                     borderWidth: day.isToday ? 2 : 0,
                     borderColor: accentColor,
@@ -205,7 +230,7 @@ export default function TaskDetailScreen({ route, navigation }) {
             ))}
           </View>
         ))}
-        {/* Legenda */}
+        {/* Legenda do calendário */}
         <View style={styles.calendarLegend}>
           <View style={[styles.legendDot, { backgroundColor: accentColor }]} />
           <Text style={styles.legendText}>Feito</Text>
@@ -214,9 +239,10 @@ export default function TaskDetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      {/* ─── Formulário de detalhes / edição ─── */}
+      {/* ─── Card de detalhes / edição ─── */}
       <View style={styles.card}>
-        {/* Campo Nome */}
+
+        {/* Campo Nome — TextInput em modo edição, Text em visualização */}
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Nome</Text>
           {editing ? (
@@ -257,7 +283,7 @@ export default function TaskDetailScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* Seletores de ícone e cor (só em modo de edição) */}
+        {/* Seletores de ícone e cor — visíveis APENAS no modo edição */}
         {editing && (
           <>
             <View style={styles.fieldDivider} />
@@ -306,7 +332,8 @@ export default function TaskDetailScreen({ route, navigation }) {
         )}
 
         <View style={styles.fieldDivider} />
-        {/* Metadado: data de criação */}
+
+        {/* Metadado: data de criação do hábito */}
         <View style={styles.metaRow}>
           <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
           <Text style={styles.metaText}>
@@ -317,10 +344,12 @@ export default function TaskDetailScreen({ route, navigation }) {
 
       {/* ─── Botões de ação ─── */}
       {editing ? (
+        // Modo edição: Cancelar + Salvar
         <View style={styles.buttonRow}>
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={() => {
+              // Restaura os valores originais ao cancelar
               setName(habit.name);
               setDescription(habit.description);
               setIcon(habit.icon);
@@ -340,6 +369,7 @@ export default function TaskDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       ) : (
+        // Modo visualização: botão de excluir com estilo de perigo
         <TouchableOpacity style={styles.deleteButton} onPress={handleDelete} activeOpacity={0.8}>
           <Ionicons name="trash-outline" size={18} color={colors.danger} />
           <Text style={styles.deleteButtonText}>Excluir Hábito</Text>
@@ -353,7 +383,7 @@ const createStyles = (colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     scrollContent: { padding: 16, paddingBottom: 40 },
-    // ─── Cabeçalho ───
+    // ─── Cabeçalho colorido ───
     habitHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -434,7 +464,7 @@ const createStyles = (colors) =>
     },
     legendDot: { width: 10, height: 10, borderRadius: 5 },
     legendText: { fontSize: 11, color: colors.textSecondary, marginLeft: 4 },
-    // ─── Campos ───
+    // ─── Campos de detalhes ───
     field: { paddingVertical: 8 },
     fieldDivider: { height: 1, backgroundColor: colors.border, marginVertical: 2 },
     fieldLabel: {
@@ -456,7 +486,7 @@ const createStyles = (colors) =>
       borderColor: colors.border,
     },
     textArea: { height: 80, paddingTop: 12 },
-    // ─── Ícones e cores (edição) ───
+    // ─── Seletores (edição) ───
     iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
     iconOption: {
       width: 42,
@@ -489,7 +519,7 @@ const createStyles = (colors) =>
     // ─── Metadados ───
     metaRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
     metaText: { fontSize: 12, color: colors.textSecondary },
-    // ─── Botões ───
+    // ─── Botões de ação ───
     buttonRow: { flexDirection: 'row', gap: 12 },
     cancelButton: {
       flex: 1,

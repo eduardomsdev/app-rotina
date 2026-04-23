@@ -1,8 +1,19 @@
 /**
- * RegisterScreen.js — Tela 6: Cadastro (bônus — vai além do mínimo de 5 telas)
+ * RegisterScreen.js — Tela 2: Cadastro de novo usuário.
  *
- * Permite criar uma nova conta com nome, email e senha.
- * Valida campos localmente antes de chamar register() do AppContext.
+ * Essa tela foi adicionada como um bônus — o requisito era de no mínimo
+ * 5 telas, mas achei que o app ficaria incompleto sem uma tela de cadastro.
+ *
+ * O formulário tem 4 campos: nome, email, senha e confirmação de senha.
+ * Fiz validações em duas camadas:
+ *  1. Na própria tela: verificações simples (campos preenchidos, senhas iguais)
+ *  2. No AppContext: validação completa via security.js antes de salvar
+ *
+ * Após o cadastro bem-sucedido, o usuário já fica logado automaticamente
+ * (sem precisar voltar para o login e digitar tudo de novo).
+ *
+ * Componentes RN utilizados: View, Text, TextInput, TouchableOpacity,
+ *                            KeyboardAvoidingView, ScrollView, ActivityIndicator
  */
 import React, { useState } from 'react';
 import {
@@ -25,6 +36,7 @@ export default function RegisterScreen({ navigation }) {
   const { register, theme } = useApp();
   const colors = getTheme(theme);
 
+  // Estados dos campos do formulário
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,7 +44,7 @@ export default function RegisterScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    // Validações de formulário
+    // Validações locais antes de chamar o contexto
     if (!name.trim() || !email.trim() || !password.trim()) {
       Alert.alert('Atenção', 'Preencha todos os campos.');
       return;
@@ -41,6 +53,7 @@ export default function RegisterScreen({ navigation }) {
       Alert.alert('Senha fraca', 'A senha deve ter no mínimo 6 caracteres.');
       return;
     }
+    // Confirmação de senha — verificação feita aqui na tela mesmo
     if (password !== confirmPassword) {
       Alert.alert('Erro', 'As senhas não coincidem.');
       return;
@@ -53,7 +66,7 @@ export default function RegisterScreen({ navigation }) {
     if (!result.success) {
       Alert.alert('Erro no Cadastro', result.message);
     }
-    // Se success, o AppNavigator redireciona automaticamente para a tela principal
+    // Se success === true, o AppContext já faz o login e o Navigator redireciona
   };
 
   const styles = createStyles(colors);
@@ -68,7 +81,9 @@ export default function RegisterScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Cabeçalho com botão voltar manual (header está oculto na AuthStack) */}
+
+        {/* Cabeçalho com botão de voltar manual
+            (o header está oculto na AuthStack, então preciso fazer meu próprio) */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={22} color={colors.primary} />
@@ -81,8 +96,9 @@ export default function RegisterScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Formulário de cadastro */}
+        {/* ─── Formulário de cadastro ─── */}
         <View style={styles.formContainer}>
+
           {/* Campo Nome */}
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>Nome Completo</Text>
@@ -94,7 +110,7 @@ export default function RegisterScreen({ navigation }) {
                 placeholderTextColor={colors.placeholder}
                 value={name}
                 onChangeText={setName}
-                autoCapitalize="words"
+                autoCapitalize="words" // capitaliza o início de cada palavra
                 returnKeyType="next"
               />
             </View>
@@ -130,7 +146,7 @@ export default function RegisterScreen({ navigation }) {
                 placeholderTextColor={colors.placeholder}
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry // esconde a senha
                 returnKeyType="next"
               />
             </View>
@@ -149,12 +165,12 @@ export default function RegisterScreen({ navigation }) {
                 onChangeText={setConfirmPassword}
                 secureTextEntry
                 returnKeyType="done"
-                onSubmitEditing={handleRegister}
+                onSubmitEditing={handleRegister} // submete ao pressionar "done"
               />
             </View>
           </View>
 
-          {/* Botão Criar Conta */}
+          {/* Botão Criar Conta — exibe spinner durante o processamento */}
           <TouchableOpacity
             style={[styles.registerButton, loading && styles.buttonDisabled]}
             onPress={handleRegister}
@@ -168,7 +184,7 @@ export default function RegisterScreen({ navigation }) {
             )}
           </TouchableOpacity>
 
-          {/* Link para Login */}
+          {/* Link para voltar ao login */}
           <TouchableOpacity style={styles.loginLink} onPress={() => navigation.goBack()}>
             <Text style={styles.loginLinkText}>
               Já tem uma conta?{'  '}
@@ -196,7 +212,7 @@ const createStyles = (colors) =>
       paddingTop: 12,
     },
     backButton: {
-      flexDirection: 'row',
+      flexDirection: 'row', // ícone + texto lado a lado (Flexbox)
       alignItems: 'center',
       marginBottom: 20,
       gap: 6,

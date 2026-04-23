@@ -1,10 +1,21 @@
 /**
- * LoginScreen.js — Tela 1: Login
+ * LoginScreen.js — Tela 1: Login do usuário.
  *
- * Componentes utilizados: View, Text, TextInput, Image, TouchableOpacity (Button nativo)
- * Layout com Flexbox: coluna centralizada, ScrollView para teclado não sobrepor
+ * Primeira tela que o usuário vê ao abrir o app (se não estiver logado).
+ * Usei um layout centralizado com ScrollView para garantir que o conteúdo
+ * não fique escondido atrás do teclado quando o usuário começar a digitar.
  *
- * Credenciais de demonstração:
+ * Componentes RN utilizados nessa tela:
+ *  - View: containers e agrupamentos de elementos
+ *  - Text: textos, labels e mensagens
+ *  - TextInput: campos de email e senha
+ *  - Image: logo do aplicativo (requisito acadêmico)
+ *  - TouchableOpacity: botões estilizados
+ *  - KeyboardAvoidingView: empurra o layout para cima quando o teclado aparece
+ *  - ScrollView: permite scroll se o conteúdo não couber na tela
+ *  - ActivityIndicator: spinner durante o carregamento do login
+ *
+ * Credenciais de demonstração para teste:
  *   joao@email.com / 123456
  *   maria@email.com / 123456
  */
@@ -30,12 +41,14 @@ export default function LoginScreen({ navigation }) {
   const { login, theme } = useApp();
   const colors = getTheme(theme);
 
+  // Estados dos campos do formulário
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // toggle de ver senha
 
   const handleLogin = async () => {
+    // Validação básica antes de chamar o contexto
     if (!email.trim() || !password.trim()) {
       Alert.alert('Atenção', 'Preencha todos os campos para continuar.');
       return;
@@ -48,13 +61,13 @@ export default function LoginScreen({ navigation }) {
     if (!result.success) {
       Alert.alert('Erro de Login', result.message);
     }
-    // Se success === true, o AppNavigator troca automaticamente para MainTabNavigator
+    // Se success === true, o AppNavigator detecta o usuário e troca para o Tab Navigator
   };
 
   const styles = createStyles(colors);
 
   return (
-    // KeyboardAvoidingView empurra o conteúdo para cima quando o teclado aparece
+    // KeyboardAvoidingView: comportamento diferente no iOS (padding) e Android (height)
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -62,10 +75,16 @@ export default function LoginScreen({ navigation }) {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="handled" // permite tocar em botões com teclado aberto
       >
-        {/* ─── Logo do aplicativo (componente Image) ─── */}
+
+        {/* ─── Logo do aplicativo (componente Image — requisito acadêmico) ─── */}
         <View style={styles.logoContainer}>
+          {/*
+            Image: exibe o ícone do app usando uma URL externa.
+            Em um app de produção, o logo estaria nos assets locais.
+            Para este trabalho, usei uma URL de ícone público para simplificar.
+          */}
           <Image
             source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2098/2098402.png' }}
             style={styles.logo}
@@ -79,7 +98,7 @@ export default function LoginScreen({ navigation }) {
         <View style={styles.formContainer}>
           <Text style={styles.welcomeText}>Bem-vindo de volta! 👋</Text>
 
-          {/* Campo Email — TextInput */}
+          {/* Campo Email — TextInput com configurações de teclado adequadas */}
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>Email</Text>
             <View style={styles.inputContainer}>
@@ -90,15 +109,15 @@ export default function LoginScreen({ navigation }) {
                 placeholderTextColor={colors.placeholder}
                 value={email}
                 onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
+                keyboardType="email-address" // teclado otimizado para email
+                autoCapitalize="none"         // email em minúsculas
+                autoCorrect={false}           // sem autocorreção no email
                 returnKeyType="next"
               />
             </View>
           </View>
 
-          {/* Campo Senha — TextInput com toggle de visibilidade */}
+          {/* Campo Senha — TextInput com toggle para mostrar/esconder */}
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>Senha</Text>
             <View style={styles.inputContainer}>
@@ -109,10 +128,11 @@ export default function LoginScreen({ navigation }) {
                 placeholderTextColor={colors.placeholder}
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry={!showPassword}
+                secureTextEntry={!showPassword} // esconde a senha por padrão
                 returnKeyType="done"
-                onSubmitEditing={handleLogin}
+                onSubmitEditing={handleLogin} // submete ao pressionar "done" no teclado
               />
+              {/* Botão do olho para mostrar/esconder a senha */}
               <TouchableOpacity
                 style={styles.eyeButton}
                 onPress={() => setShowPassword(!showPassword)}
@@ -126,11 +146,11 @@ export default function LoginScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Botão de Login — TouchableOpacity estilizado */}
+          {/* Botão de Login — exibe spinner enquanto processa */}
           <TouchableOpacity
             style={[styles.loginButton, loading && styles.buttonDisabled]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={loading} // desabilita o botão durante o carregamento
             activeOpacity={0.8}
           >
             {loading ? (
@@ -140,20 +160,20 @@ export default function LoginScreen({ navigation }) {
             )}
           </TouchableOpacity>
 
-          {/* Dica de credenciais para facilitar o teste acadêmico */}
+          {/* Dica com as credenciais de demonstração para facilitar o teste */}
           <View style={styles.demoHint}>
             <Ionicons name="information-circle-outline" size={14} color={colors.primary} />
             <Text style={styles.demoHintText}>  Demo: joao@email.com / 123456</Text>
           </View>
 
-          {/* Divisor visual */}
+          {/* Divisor visual entre login e cadastro */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>ou</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Botão de criar conta — navega para RegisterScreen */}
+          {/* Botão de cadastro — navega para a RegisterScreen */}
           <TouchableOpacity
             style={styles.registerButton}
             onPress={() => navigation.navigate('Register')}
@@ -167,7 +187,7 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-// Estilos criados dinamicamente para suportar troca de tema
+// Estilos criados como função para suportar os dois temas (claro/escuro)
 const createStyles = (colors) =>
   StyleSheet.create({
     container: {
@@ -176,12 +196,12 @@ const createStyles = (colors) =>
     },
     scrollContent: {
       flexGrow: 1,
-      justifyContent: 'center',
+      justifyContent: 'center', // centraliza verticalmente
       padding: 24,
     },
     // ─── Logo ───
     logoContainer: {
-      alignItems: 'center',
+      alignItems: 'center', // centraliza horizontalmente (Flexbox)
       marginBottom: 36,
     },
     logo: {
@@ -230,7 +250,7 @@ const createStyles = (colors) =>
       letterSpacing: 0.5,
     },
     inputContainer: {
-      flexDirection: 'row',
+      flexDirection: 'row', // ícone + TextInput lado a lado (Flexbox)
       alignItems: 'center',
       backgroundColor: colors.inputBg,
       borderRadius: 12,
@@ -267,7 +287,7 @@ const createStyles = (colors) =>
       elevation: 5,
     },
     buttonDisabled: {
-      opacity: 0.7,
+      opacity: 0.7, // feedback visual de botão desabilitado
     },
     loginButtonText: {
       color: '#FFFFFF',
@@ -289,7 +309,7 @@ const createStyles = (colors) =>
       fontWeight: '600',
     },
     divider: {
-      flexDirection: 'row',
+      flexDirection: 'row', // linha + texto + linha (Flexbox)
       alignItems: 'center',
       marginVertical: 20,
     },

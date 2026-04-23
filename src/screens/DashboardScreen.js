@@ -1,13 +1,23 @@
 /**
- * DashboardScreen.js — Tela principal do habit tracker (nova tela).
+ * DashboardScreen.js — Tela 3: Dashboard com visão geral dos hábitos.
  *
- * Exibe 4 cards expansíveis (DashboardCard = acordeão):
- *  1. "Hoje"          → progresso do dia com barra e % (expandido por padrão)
- *  2. "Sequências"    → streak atual de cada hábito (ranking)
- *  3. "Esta Semana"   → mini gráfico de barras dos últimos 7 dias
- *  4. "Estatísticas"  → taxa de conclusão dos últimos 30 dias por hábito
+ * Essa tela é a mais visual do app. A ideia foi dar ao usuário um painel
+ * completo com diferentes perspectivas sobre seus hábitos, sem precisar
+ * navegar para outras telas.
  *
- * A frase motivacional muda a cada dia (baseada no dia do ano).
+ * Usei o componente DashboardCard (acordeão) para organizar as informações
+ * em seções expansíveis, deixando a tela mais limpa e evitando sobrecarga visual.
+ *
+ * Os 4 cards do Dashboard:
+ *  1. "Progresso de Hoje" — % de conclusão com barra de progresso (aberto por padrão)
+ *  2. "Sequências Ativas" — ranking de streaks por hábito com badge 🔥
+ *  3. "Esta Semana" — mini gráfico de barras dos últimos 7 dias
+ *  4. "Estatísticas (30 dias)" — taxa de conclusão e recorde de cada hábito
+ *
+ * A frase motivacional no topo muda a cada dia (baseada no número do dia do ano),
+ * então o usuário sempre vê uma mensagem diferente ao abrir o app.
+ *
+ * Componentes RN utilizados: View, Text, ScrollView
  */
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useApp } from '../context/AppContext';
@@ -16,7 +26,7 @@ import { HabitService } from '../services/habitService';
 import { DateUtils } from '../utils/dateUtils';
 import DashboardCard from '../components/DashboardCard';
 
-// Frases motivacionais — rotação diária
+// Frases motivacionais — rotação diária baseada no número do dia do ano
 const QUOTES = [
   'A consistência transforma o esforço em resultado.',
   'Cada dia é uma nova oportunidade de crescer.',
@@ -31,20 +41,22 @@ export default function DashboardScreen() {
   const { habits, user, theme } = useApp();
   const colors = getTheme(theme);
 
+  // Dados calculados pelo HabitService para os cards
   const stats = HabitService.getTodayStats(habits);
   const weeklyData = HabitService.getDailyAggregates(habits, 7);
   const motivationMsg = HabitService.getMotivationMessage(stats.percent);
 
-  // Frase do dia: índice = dia do ano mod total de frases
+  // Seleciona a frase do dia: índice = dia do ano % quantidade de frases
+  // Isso garante que a frase muda todo dia, mas de forma determinística
   const dailyQuote = QUOTES[DateUtils.dayOfYear() % QUOTES.length];
 
   const styles = createStyles(colors);
 
-  // ─── Conteúdo do card "Hoje" ───────────────────────────────────
+  // ─── Conteúdo do card "Progresso de Hoje" ────────────────────────────────
   const TodayContent = () => (
     <View>
       <View style={styles.progressRow}>
-        {/* Número grande em destaque */}
+        {/* Número grande em destaque no lado esquerdo */}
         <View style={styles.percentBox}>
           <Text style={[styles.percentNumber, { color: colors.primary }]}>
             {stats.percent}%
@@ -52,7 +64,7 @@ export default function DashboardScreen() {
           <Text style={styles.percentLabel}>concluído</Text>
         </View>
 
-        {/* Detalhes à direita */}
+        {/* Detalhes à direita: feitos, pendentes e mensagem motivacional */}
         <View style={styles.progressDetails}>
           <Text style={styles.progressDetailText}>
             ✅ {stats.completed} hábito{stats.completed !== 1 ? 's' : ''} feito{stats.completed !== 1 ? 's' : ''}
@@ -66,7 +78,7 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Barra de progresso */}
+      {/* Barra de progresso — fica verde quando 100% completo */}
       <View style={styles.progressBarBg}>
         <View
           style={[
@@ -81,9 +93,9 @@ export default function DashboardScreen() {
     </View>
   );
 
-  // ─── Conteúdo do card "Sequências" ────────────────────────────
+  // ─── Conteúdo do card "Sequências Ativas" ────────────────────────────────
   const StreakContent = () => {
-    // Ordena hábitos pelo streak atual (maior primeiro)
+    // Ordena os hábitos pelo streak atual (maior streak aparece no topo)
     const sorted = [...habits]
       .map((h) => ({ ...h, streak: HabitService.calculateStreak(h.history) }))
       .sort((a, b) => b.streak - a.streak);
@@ -96,12 +108,14 @@ export default function DashboardScreen() {
       <View style={styles.streakList}>
         {sorted.map((h) => (
           <View key={h.id} style={styles.streakRow}>
+            {/* Ícone do hábito com fundo suave */}
             <View style={[styles.streakIcon, { backgroundColor: h.color + '20' }]}>
               <Text style={styles.streakEmoji}>{h.icon}</Text>
             </View>
             <Text style={styles.streakName} numberOfLines={1}>
               {h.name}
             </Text>
+            {/* Badge de streak — mostra 🔥 se tiver sequência ativa */}
             <View style={styles.streakBadge}>
               {h.streak > 0 ? (
                 <>
@@ -120,16 +134,19 @@ export default function DashboardScreen() {
     );
   };
 
-  // ─── Conteúdo do card "Esta Semana" ───────────────────────────
+  // ─── Conteúdo do card "Esta Semana" ──────────────────────────────────────
   const WeekContent = () => (
     <View>
+      {/* Gráfico de barras simples: cada coluna representa um dia */}
       <View style={styles.weekChart}>
         {weeklyData.map((day, idx) => {
+          // Altura da barra proporcional à % de conclusão daquele dia
           const fillHeight = day.total > 0 ? (day.completed / day.total) * 56 : 0;
+          // Hoje fica com a cor principal, os outros dias ficam mais claros
           const barColor = day.isToday ? colors.primary : colors.primaryLight;
           return (
             <View key={idx} style={styles.weekColumn}>
-              {/* Barra de altura variável (gráfico de barras simples) */}
+              {/* Container de altura fixa — a barra cresce de baixo para cima */}
               <View style={styles.weekBarContainer}>
                 {day.total > 0 && (
                   <View
@@ -140,11 +157,11 @@ export default function DashboardScreen() {
                   />
                 )}
               </View>
-              {/* Contador de hábitos feitos */}
+              {/* Contagem de hábitos feitos/total naquele dia */}
               <Text style={[styles.weekCount, day.isToday && { color: colors.primary, fontWeight: '700' }]}>
                 {day.completed}/{day.total}
               </Text>
-              {/* Nome do dia */}
+              {/* Nome do dia (seg, ter, qua...) — hoje em destaque */}
               <Text style={[styles.weekDayName, day.isToday && { color: colors.primary, fontWeight: '700' }]}>
                 {day.dayName}
               </Text>
@@ -155,7 +172,7 @@ export default function DashboardScreen() {
     </View>
   );
 
-  // ─── Conteúdo do card "Estatísticas (30 dias)" ────────────────
+  // ─── Conteúdo do card "Estatísticas (30 dias)" ───────────────────────────
   const StatsContent = () => {
     if (habits.length === 0) {
       return <Text style={styles.emptyText}>Nenhum hábito criado ainda.</Text>;
@@ -171,6 +188,7 @@ export default function DashboardScreen() {
               <Text style={styles.statsEmoji}>{h.icon}</Text>
               <View style={styles.statsInfo}>
                 <Text style={styles.statsName} numberOfLines={1}>{h.name}</Text>
+                {/* Barra de progresso com largura proporcional à taxa de conclusão */}
                 <View style={styles.statsBarBg}>
                   <View
                     style={[
@@ -180,6 +198,7 @@ export default function DashboardScreen() {
                   />
                 </View>
               </View>
+              {/* Taxa de conclusão e recorde de streak à direita */}
               <View style={styles.statsNumbers}>
                 <Text style={[styles.statsRate, { color: h.color }]}>{rate}%</Text>
                 <Text style={styles.statsLongest}>🏆 {longest}d</Text>
@@ -198,14 +217,16 @@ export default function DashboardScreen() {
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      {/* ─── Cabeçalho ─── */}
+      {/* ─── Cabeçalho com saudação e contador de hoje ─── */}
       <View style={styles.header}>
         <View>
+          {/* Pega o primeiro nome do usuário (split pelo espaço) */}
           <Text style={styles.greeting}>
             Olá, {user?.name?.split(' ')[0] || 'usuário'}! ✨
           </Text>
           <Text style={styles.date}>{DateUtils.todayFormatted()}</Text>
         </View>
+        {/* Badge com o progresso do dia */}
         <View style={styles.headerBadge}>
           <Text style={styles.headerBadgeText}>
             {stats.completed}/{stats.total}
@@ -214,13 +235,15 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Frase motivacional do dia */}
+      {/* ─── Frase motivacional do dia ─── */}
       <View style={styles.quoteCard}>
         <Text style={styles.quoteIcon}>💡</Text>
         <Text style={styles.quoteText}>{dailyQuote}</Text>
       </View>
 
-      {/* ─── Cards expansíveis ─── */}
+      {/* ─── Cards expansíveis do Dashboard ─── */}
+
+      {/* Card 1: aberto por padrão para o usuário ver o progresso imediatamente */}
       <DashboardCard
         title="Progresso de Hoje"
         icon="📊"
@@ -273,7 +296,7 @@ const createStyles = (colors) =>
     },
     // ─── Cabeçalho ───
     header: {
-      flexDirection: 'row',
+      flexDirection: 'row',       // saudação + badge lado a lado (Flexbox)
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 14,
@@ -415,7 +438,7 @@ const createStyles = (colors) =>
       fontSize: 12,
       color: colors.textSecondary,
     },
-    // ─── Card "Semana" ───
+    // ─── Card "Semana" (gráfico de barras) ───
     weekChart: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -431,7 +454,7 @@ const createStyles = (colors) =>
       backgroundColor: colors.border,
       borderRadius: 4,
       overflow: 'hidden',
-      justifyContent: 'flex-end', // barra cresce de baixo para cima
+      justifyContent: 'flex-end', // faz a barra crescer de baixo para cima
     },
     weekBarFill: {
       width: '100%',

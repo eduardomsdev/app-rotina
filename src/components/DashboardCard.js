@@ -1,17 +1,29 @@
 /**
- * DashboardCard.js — Card expansível (acordeão / collapsible) para o Dashboard.
+ * DashboardCard.js — Card expansível (acordeão) usado no Dashboard.
  *
- * Usa LayoutAnimation para animar suavemente a expansão e recolhimento do conteúdo.
- * O LayoutAnimation anima automaticamente qualquer mudança de layout na próxima
- * renderização — mais simples que Animated.Value e suficiente para este caso.
+ * A ideia desse componente é mostrar um resumo sempre visível no cabeçalho
+ * e, ao tocar, expandir o corpo com os detalhes. Isso mantém o Dashboard
+ * organizado sem sobrecarregar o usuário com informação de uma vez.
  *
- * Props:
- *  - title (string): título do card
- *  - icon (string): emoji exibido na esquerda
- *  - summary (string): texto de resumo sempre visível (subtítulo)
- *  - accentColor (string): cor da borda lateral e ícone
- *  - defaultExpanded (bool): se o card começa expandido
+ * Para a animação de expandir/recolher, usei o LayoutAnimation do React Native.
+ * Ele funciona assim: antes de mudar o estado, eu configuro a animação;
+ * o React Native então anima automaticamente qualquer mudança de layout
+ * que acontecer na próxima renderização. É mais simples do que usar
+ * Animated.Value manualmente e resolve bem para esse caso.
+ *
+ * No Android, o LayoutAnimation precisa ser habilitado explicitamente com
+ * UIManager.setLayoutAnimationEnabledExperimental — isso é feito fora do
+ * componente para rodar uma única vez quando o módulo é carregado.
+ *
+ * Props recebidas:
+ *  - title: string — título exibido no cabeçalho do card
+ *  - icon: string — emoji à esquerda do título
+ *  - summary: string — subtítulo sempre visível
+ *  - accentColor: string — cor da barra lateral e do fundo do ícone
+ *  - defaultExpanded: boolean — começa aberto? (padrão: fechado)
  *  - children: conteúdo que aparece ao expandir
+ *
+ * Componentes RN utilizados: View, Text, TouchableOpacity, LayoutAnimation
  */
 import React, { useState } from 'react';
 import {
@@ -27,7 +39,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { getTheme } from '../utils/themes';
 
-// Habilita LayoutAnimation no Android (desabilitado por padrão no Android)
+// Habilita LayoutAnimation no Android (vem desabilitado por padrão)
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -44,11 +56,12 @@ export default function DashboardCard({
   const colors = getTheme(theme);
   const [expanded, setExpanded] = useState(defaultExpanded);
 
+  // Usa a cor de destaque passada via prop, ou a cor primária do tema como fallback
   const accent = accentColor || colors.primary;
 
   const handleToggle = () => {
-    // Configura a animação ANTES de alterar o estado
-    // O React Native anima automaticamente as mudanças de layout que ocorrerem
+    // IMPORTANTE: precisa configurar a animação ANTES de alterar o estado.
+    // O LayoutAnimation captura o estado atual do layout e anima até o novo.
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded((prev) => !prev);
   };
@@ -57,28 +70,29 @@ export default function DashboardCard({
 
   return (
     <View style={styles.card}>
-      {/* Barra colorida à esquerda */}
+      {/* Barra colorida de 4px no lado esquerdo do card */}
       <View style={styles.accentBar} />
 
       <View style={styles.cardInner}>
-        {/* ─── Cabeçalho clicável ─── */}
+
+        {/* ─── Cabeçalho clicável (sempre visível) ─── */}
         <TouchableOpacity
           style={styles.header}
           onPress={handleToggle}
           activeOpacity={0.8}
         >
-          {/* Ícone com fundo suave */}
+          {/* Ícone com fundo suave na cor de destaque */}
           <View style={styles.iconContainer}>
             <Text style={styles.icon}>{icon}</Text>
           </View>
 
-          {/* Título e resumo */}
+          {/* Título e subtítulo resumo */}
           <View style={styles.headerText}>
             <Text style={styles.title}>{title}</Text>
             {summary ? <Text style={styles.summary}>{summary}</Text> : null}
           </View>
 
-          {/* Seta indica estado de expansão */}
+          {/* Seta que muda de direção para indicar o estado */}
           <Ionicons
             name={expanded ? 'chevron-up' : 'chevron-down'}
             size={18}
@@ -99,10 +113,11 @@ export default function DashboardCard({
   );
 }
 
+// Os estilos recebem tanto o tema quanto a cor de destaque como parâmetros
 const createStyles = (colors, accent) =>
   StyleSheet.create({
     card: {
-      flexDirection: 'row',
+      flexDirection: 'row', // barra lateral + conteúdo (Flexbox)
       backgroundColor: colors.card,
       borderRadius: 16,
       marginBottom: 12,
@@ -113,6 +128,7 @@ const createStyles = (colors, accent) =>
       shadowRadius: 8,
       elevation: 3,
     },
+    // Barra colorida fina na esquerda
     accentBar: {
       width: 4,
       backgroundColor: accent,
@@ -130,7 +146,7 @@ const createStyles = (colors, accent) =>
       width: 38,
       height: 38,
       borderRadius: 10,
-      backgroundColor: accent + '18',
+      backgroundColor: accent + '18', // fundo com 18% de opacidade
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: 12,

@@ -1,13 +1,24 @@
 /**
- * HomeScreen.js — Tela "Hoje": lista de hábitos do dia.
+ * HomeScreen.js — Tela 4: Lista de hábitos do dia (aba "Hoje").
  *
- * Mudanças em relação à versão de tarefas:
- *  - "tasks" substituído por "habits"
- *  - FlatList usa HabitCard (com pontos de histórico e streak)
- *  - Filtros: Todos / Pendentes / Concluídos
- *  - Campo de busca em tempo real
- *  - Stats cards no topo (concluídos / pendentes)
- *  - FAB (botão flutuante) para adicionar novo hábito
+ * Essa é a tela que o usuário vai usar mais no dia a dia.
+ * Ela mostra todos os hábitos e permite marcar cada um como feito
+ * diretamente pelo botão de check no HabitCard, sem precisar abrir os detalhes.
+ *
+ * Funcionalidades implementadas:
+ *  - Cards de estatísticas no topo (feitos / pendentes / % de progresso)
+ *  - Campo de busca em tempo real (filtra enquanto o usuário digita)
+ *  - Filtros por status: Todos / Pendentes / Concluídos
+ *  - FlatList com os HabitCards filtrados
+ *  - FAB (botão flutuante) no canto inferior para adicionar novo hábito
+ *  - Componente EmptyList quando nenhum hábito corresponde ao filtro
+ *
+ * Componentes RN utilizados:
+ *  - View: todos os containers e agrupamentos
+ *  - Text: saudação, contadores, labels
+ *  - FlatList: lista de hábitos (requisito acadêmico)
+ *  - TextInput: campo de busca
+ *  - TouchableOpacity: botões de filtro e FAB
  */
 import { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
@@ -23,13 +34,19 @@ export default function HomeScreen({ navigation }) {
   const { habits, theme } = useApp();
   const colors = getTheme(theme);
 
+  // Estados dos filtros da lista
   const [searchText, setSearchText] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('all'); // 'all' | 'pending' | 'completed'
 
+  // Calcula as estatísticas do dia atual para os cards do topo
   const stats = HabitService.getTodayStats(habits);
   const today = DateUtils.todayKey();
 
-  // Filtra hábitos por texto de busca e status de conclusão
+  /**
+   * Filtra os hábitos com base no texto de busca e no filtro selecionado.
+   * A busca verifica nome e descrição ao mesmo tempo.
+   * O filtro de status usa o history do dia de hoje.
+   */
   const filteredHabits = habits.filter((h) => {
     const matchesSearch =
       h.name.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -45,6 +62,7 @@ export default function HomeScreen({ navigation }) {
 
   const styles = createStyles(colors);
 
+  // Componente de botão de filtro reutilizável (definido aqui pois usa o estado 'filter')
   const FilterButton = ({ label, value }) => (
     <TouchableOpacity
       style={[styles.filterBtn, filter === value && styles.filterBtnActive]}
@@ -59,10 +77,12 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* ─── Cabeçalho com saudação e estatísticas ─── */}
+
+      {/* ─── Cabeçalho com saudação e cards de estatísticas ─── */}
       <View style={styles.header}>
         <View style={styles.greetingRow}>
           <View>
+            {/* Saudação com o nome do dia da semana por extenso */}
             <Text style={styles.greeting}>
               {DateUtils.fullDayName().charAt(0).toUpperCase() +
                 DateUtils.fullDayName().slice(1)} 🌟
@@ -76,7 +96,7 @@ export default function HomeScreen({ navigation }) {
           <Ionicons name="leaf-outline" size={36} color={colors.primaryLight} />
         </View>
 
-        {/* Cards de estatísticas em Flexbox row */}
+        {/* Cards de estatísticas em Flexbox row — Feitos / Pendentes / Progresso */}
         <View style={styles.statsRow}>
           <View style={[styles.statCard, { backgroundColor: colors.successLight }]}>
             <Text style={[styles.statNumber, { color: colors.success }]}>{stats.completed}</Text>
@@ -95,7 +115,7 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
-      {/* ─── Campo de busca (TextInput) ─── */}
+      {/* ─── Campo de busca (TextInput — requisito acadêmico) ─── */}
       <View style={styles.searchContainer}>
         <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
         <TextInput
@@ -105,6 +125,7 @@ export default function HomeScreen({ navigation }) {
           value={searchText}
           onChangeText={setSearchText}
         />
+        {/* Botão de limpar a busca — só aparece quando há texto digitado */}
         {searchText.length > 0 && (
           <TouchableOpacity onPress={() => setSearchText('')}>
             <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
@@ -112,18 +133,19 @@ export default function HomeScreen({ navigation }) {
         )}
       </View>
 
-      {/* ─── Filtros ─── */}
+      {/* ─── Botões de filtro ─── */}
       <View style={styles.filterRow}>
         <FilterButton label="Todos" value="all" />
         <FilterButton label="Pendentes" value="pending" />
         <FilterButton label="Concluídos" value="completed" />
       </View>
 
+      {/* Contador de resultados */}
       <Text style={styles.resultCount}>
         {filteredHabits.length} hábito{filteredHabits.length !== 1 ? 's' : ''}
       </Text>
 
-      {/* ─── FlatList de hábitos ─── */}
+      {/* ─── FlatList de hábitos (requisito acadêmico) ─── */}
       <FlatList
         data={filteredHabits}
         keyExtractor={(item) => item.id}
@@ -138,7 +160,7 @@ export default function HomeScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* ─── FAB para adicionar novo hábito ─── */}
+      {/* ─── FAB (Floating Action Button) para adicionar novo hábito ─── */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => navigation.navigate('AddHabit')}
@@ -156,6 +178,7 @@ const createStyles = (colors) =>
       flex: 1,
       backgroundColor: colors.background,
     },
+    // ─── Cabeçalho ───
     header: {
       backgroundColor: colors.card,
       padding: 20,
@@ -167,7 +190,7 @@ const createStyles = (colors) =>
       elevation: 3,
     },
     greetingRow: {
-      flexDirection: 'row',
+      flexDirection: 'row',        // saudação + ícone lado a lado (Flexbox)
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 14,
@@ -184,11 +207,11 @@ const createStyles = (colors) =>
       marginTop: 2,
     },
     statsRow: {
-      flexDirection: 'row',
+      flexDirection: 'row', // três cards lado a lado (Flexbox)
       gap: 10,
     },
     statCard: {
-      flex: 1,
+      flex: 1,           // cada card ocupa espaço igual
       borderRadius: 12,
       padding: 12,
       alignItems: 'center',
@@ -202,6 +225,7 @@ const createStyles = (colors) =>
       fontWeight: '600',
       marginTop: 2,
     },
+    // ─── Campo de busca ───
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -220,6 +244,7 @@ const createStyles = (colors) =>
       fontSize: 15,
       color: colors.text,
     },
+    // ─── Filtros ───
     filterRow: {
       flexDirection: 'row',
       paddingHorizontal: 16,
@@ -255,8 +280,9 @@ const createStyles = (colors) =>
     },
     listContent: {
       padding: 16,
-      paddingBottom: 100,
+      paddingBottom: 100, // espaço extra para o FAB não cobrir o último card
     },
+    // ─── FAB ───
     fab: {
       position: 'absolute',
       bottom: 24,

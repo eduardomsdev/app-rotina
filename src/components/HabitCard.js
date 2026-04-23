@@ -1,16 +1,22 @@
 /**
- * HabitCard.js — Card de hábito para a lista do dia (HomeScreen).
+ * HabitCard.js — Card de hábito exibido na lista do dia (HomeScreen).
  *
- * Layout (Flexbox):
- *  ┌──┬──────────────────────────────────────────────┐
- *  │▌ │ [ícone]  Nome do hábito            [  ✓  ]  │
- *  │▌ │           Descrição curta                    │
- *  │▌ │ ● ● ○ ● ● ● ●              🔥 5 dias         │
- *  └──┴──────────────────────────────────────────────┘
+ * Esse componente foi um dos que mais trabalhei no projeto. Ele precisa
+ * mostrar muita informação de forma compacta e ainda ser fácil de usar.
  *
- * Barra colorida à esquerda = prioridade visual da cor do hábito.
- * Os 7 pontos = últimos 7 dias (preenchido = feito, vazio = não feito).
- * Botão ✓ = marca/desmarca como concluído hoje sem navegar para detalhes.
+ * Layout Flexbox (da esquerda para a direita):
+ * ┌──┬──────────────────────────────────────────────┐
+ * │▌ │ [ícone]  Nome do hábito            [  ✓  ]  │
+ * │▌ │           Descrição opcional                 │
+ * │▌ │ ● ● ○ ● ● ● ●              🔥 5 dias         │
+ * └──┴──────────────────────────────────────────────┘
+ *
+ * A barra colorida de 4px na esquerda usa a cor personalizada do hábito.
+ * Os 7 pontinhos mostram os últimos 7 dias: preenchido = feito, vazio = não feito.
+ * O pontinho de hoje tem uma borda extra para se destacar.
+ * O botão circular ✓ marca/desmarca o hábito sem precisar entrar nos detalhes.
+ *
+ * Componentes RN utilizados: View, Text, TouchableOpacity
  */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
@@ -23,6 +29,7 @@ export default function HabitCard({ habit, onPress }) {
   const { toggleHabitToday, theme } = useApp();
   const colors = getTheme(theme);
 
+  // Calcula os dados que preciso exibir no card
   const isCompleted = HabitService.isCompletedToday(habit);
   const streak = HabitService.calculateStreak(habit.history);
   const weekData = HabitService.getWeeklyData(habit.history);
@@ -30,20 +37,23 @@ export default function HabitCard({ habit, onPress }) {
   const styles = createStyles(colors);
 
   return (
-    // Toque no card → navega para detalhes
+    // Toque no card abre a tela de detalhes do hábito
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-      {/* Barra lateral com a cor do hábito */}
+
+      {/* Barra colorida de 4px no lado esquerdo — usa a cor personalizada do hábito */}
       <View style={[styles.colorBar, { backgroundColor: habit.color }]} />
 
       <View style={styles.content}>
+
         {/* ─── Linha superior: ícone + nome + botão de check ─── */}
         <View style={styles.topRow}>
-          {/* Container do ícone com fundo suave da cor do hábito */}
+
+          {/* Container do ícone com fundo suave (cor do hábito com 20% de opacidade) */}
           <View style={[styles.iconContainer, { backgroundColor: habit.color + '20' }]}>
             <Text style={styles.icon}>{habit.icon}</Text>
           </View>
 
-          {/* Nome e descrição */}
+          {/* Nome e descrição do hábito — numberOfLines evita overflow */}
           <View style={styles.nameArea}>
             <Text
               style={[styles.name, isCompleted && styles.nameCompleted]}
@@ -51,6 +61,7 @@ export default function HabitCard({ habit, onPress }) {
             >
               {habit.name}
             </Text>
+            {/* Só exibe a descrição se ela existir */}
             {habit.description ? (
               <Text style={styles.description} numberOfLines={1}>
                 {habit.description}
@@ -58,15 +69,15 @@ export default function HabitCard({ habit, onPress }) {
             ) : null}
           </View>
 
-          {/* Botão circular de check — marca como feito hoje */}
+          {/* Botão de check circular — preenchido com a cor do hábito quando concluído */}
           <TouchableOpacity
             style={[
               styles.checkButton,
               { borderColor: habit.color },
-              isCompleted && { backgroundColor: habit.color },
+              isCompleted && { backgroundColor: habit.color }, // fundo cheio quando feito
             ]}
             onPress={() => toggleHabitToday(habit.id)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} // área de toque maior
           >
             <Ionicons
               name={isCompleted ? 'checkmark' : 'add'}
@@ -76,9 +87,10 @@ export default function HabitCard({ habit, onPress }) {
           </TouchableOpacity>
         </View>
 
-        {/* ─── Linha inferior: 7 pontos do histórico + streak ─── */}
+        {/* ─── Linha inferior: 7 pontinhos do histórico + badge de streak ─── */}
         <View style={styles.bottomRow}>
-          {/* Pontinhos dos últimos 7 dias */}
+
+          {/* Um pontinho para cada um dos últimos 7 dias */}
           <View style={styles.weekDots}>
             {weekData.map((day, idx) => (
               <View
@@ -86,14 +98,14 @@ export default function HabitCard({ habit, onPress }) {
                 style={[
                   styles.dot,
                   { backgroundColor: day.completed ? habit.color : colors.border },
-                  // Hoje tem uma borda de destaque
+                  // Hoje tem borda de destaque e fica um pouco maior
                   day.isToday && [styles.dotToday, { borderColor: habit.color }],
                 ]}
               />
             ))}
           </View>
 
-          {/* Badge de streak — só aparece se tiver pelo menos 1 dia consecutivo */}
+          {/* Badge de streak — só aparece se houver pelo menos 1 dia consecutivo */}
           {streak > 0 && (
             <View style={styles.streakBadge}>
               <Text style={styles.streakText}>
@@ -107,13 +119,14 @@ export default function HabitCard({ habit, onPress }) {
   );
 }
 
+// Estilos criados como função para suportar troca de tema
 const createStyles = (colors) =>
   StyleSheet.create({
     card: {
       backgroundColor: colors.card,
       borderRadius: 16,
       marginBottom: 12,
-      flexDirection: 'row',
+      flexDirection: 'row', // barra lateral + conteúdo lado a lado (Flexbox)
       overflow: 'hidden',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
@@ -121,7 +134,7 @@ const createStyles = (colors) =>
       shadowRadius: 8,
       elevation: 3,
     },
-    // Barra colorida de 4px à esquerda
+    // Barra colorida fina na esquerda do card
     colorBar: {
       width: 4,
     },
@@ -155,7 +168,7 @@ const createStyles = (colors) =>
       fontWeight: '600',
       color: colors.text,
     },
-    // Tachado quando concluído hoje
+    // Quando concluído, o nome aparece tachado
     nameCompleted: {
       textDecorationLine: 'line-through',
       color: colors.textSecondary,
@@ -188,7 +201,7 @@ const createStyles = (colors) =>
       height: 8,
       borderRadius: 4,
     },
-    // Hoje: bordinha de destaque e tamanho ligeiramente maior
+    // O pontinho de hoje é levemente maior e tem borda para se destacar
     dotToday: {
       width: 10,
       height: 10,

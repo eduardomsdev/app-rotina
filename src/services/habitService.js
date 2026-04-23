@@ -1,39 +1,47 @@
 /**
- * habitService.js — Lógica de negócio para hábitos.
+ * habitService.js — Lógica de negócio para os hábitos.
  *
- * Separa cálculos complexos do contexto e das telas (boas práticas de arquitetura).
- * Nenhuma chamada de UI aqui — apenas funções puras que recebem dados e retornam resultados.
+ * Optei por separar os cálculos mais complexos das telas e do contexto,
+ * seguindo uma separação de responsabilidades básica:
+ *  - Telas: só apresentam dados e capturam interações do usuário
+ *  - AppContext: gerencia o estado e a persistência
+ *  - HabitService: faz os cálculos e retorna resultados prontos para exibir
+ *
+ * Nenhuma chamada de UI aqui — só funções puras que recebem dados
+ * e retornam números, arrays ou strings.
  *
  * Conceitos implementados:
  *  - Streak: sequência de dias consecutivos com o hábito concluído
- *  - Completion rate: taxa de conclusão dos últimos 30 dias
- *  - Weekly aggregates: quantos hábitos foram feitos em cada dia da semana
+ *  - Completion rate: porcentagem de conclusão nos últimos 30 dias
+ *  - Daily aggregates: agrupamento por dia para o gráfico semanal
  */
 import { DateUtils } from '../utils/dateUtils';
 
 export const HabitService = {
+
   /**
-   * Verifica se o hábito foi marcado como concluído hoje.
+   * Verifica se o hábito já foi marcado como feito hoje.
+   * Simples: só verifica se history[chave-de-hoje] === true.
    */
   isCompletedToday(habit) {
     return habit.history[DateUtils.todayKey()] === true;
   },
 
   /**
-   * Calcula a sequência atual (streak) de dias consecutivos.
+   * Calcula o streak atual: quantos dias consecutivos o hábito foi feito.
    *
-   * Regra:
-   *  - Se hoje foi concluído: conta de hoje para trás enquanto houver dias consecutivos.
-   *  - Se hoje NÃO foi concluído ainda: conta de ontem para trás
-   *    (damos a chance de completar hoje sem "quebrar" o streak).
+   * A lógica que decidi usar:
+   *  - Se hoje JÁ foi marcado: conta de hoje para trás
+   *  - Se hoje AINDA NÃO foi marcado: conta de ontem para trás
+   *    (assim o streak não "quebra" só porque ainda não é fim do dia)
    *
-   * Limite de busca: 365 dias (evita loop infinito em históricos antigos).
+   * O loop vai até 365 para evitar travar em históricos muito antigos.
    */
   calculateStreak(history) {
     if (!history || Object.keys(history).length === 0) return 0;
 
     const today = DateUtils.todayKey();
-    // Se hoje não foi feito, começamos a contar do dia anterior
+    // Se hoje não foi marcado, começo a contar do dia anterior
     let startOffset = history[today] === true ? 0 : 1;
 
     let streak = 0;
@@ -42,6 +50,7 @@ export const HabitService = {
       if (history[key] === true) {
         streak++;
       } else {
+        // Qualquer dia não feito quebra a sequência
         break;
       }
     }
@@ -49,15 +58,18 @@ export const HabitService = {
   },
 
   /**
-   * Calcula o maior streak já atingido no histórico completo do hábito.
-   * Percorre todas as datas marcadas como 'true' em ordem cronológica.
+   * Calcula o maior streak já alcançado em todo o histórico do hábito.
+   *
+   * Pego todos os dias marcados como true, ordeno em ordem crescente
+   * e percorro verificando se dias consecutivos têm diferença de 1 dia.
+   * O formato YYYY-MM-DD permite ordenar como string normalmente.
    */
   calculateLongestStreak(history) {
     if (!history) return 0;
 
     const doneDays = Object.keys(history)
       .filter((k) => history[k] === true)
-      .sort(); // ordena lexicograficamente (funciona com 'YYYY-MM-DD')
+      .sort(); // funciona porque o formato YYYY-MM-DD é ordenável lexicograficamente
 
     if (doneDays.length === 0) return 0;
 
@@ -65,14 +77,17 @@ export const HabitService = {
     let current = 1;
 
     for (let i = 1; i < doneDays.length; i++) {
+      // O +T12:00:00 evita o problema de timezone (veja dateUtils.js)
       const prev = new Date(doneDays[i - 1] + 'T12:00:00');
       const curr = new Date(doneDays[i] + 'T12:00:00');
       const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
 
       if (diffDays === 1) {
+        // Dias consecutivos: incrementa a sequência atual
         current++;
         if (current > longest) longest = current;
       } else {
+        // Quebrou a sequência: reinicia o contador
         current = 1;
       }
     }
@@ -80,8 +95,8 @@ export const HabitService = {
   },
 
   /**
-   * Retorna os dados dos últimos 7 dias para exibição no HabitCard.
-   * Cada elemento indica se o hábito foi feito naquele dia.
+   * Retorna os dados dos últimos 7 dias com status de conclusão.
+   * Uso nos pontinhos do HabitCard para mostrar o histórico visual da semana.
    */
   getWeeklyData(history) {
     return DateUtils.lastNDays(7).map((day) => ({
@@ -91,9 +106,10 @@ export const HabitService = {
   },
 
   /**
-   * Taxa de conclusão dos últimos 30 dias (0 a 100).
-   * Base fixa de 30 dias (não o total de dias desde a criação do hábito)
-   * para comparabilidade entre hábitos de idades diferentes.
+   * Calcula a taxa de conclusão dos últimos 30 dias (0 a 100%).
+   *
+   * Uso base fixa de 30 dias para todos os hábitos, independentemente
+   * de quando foram criados. Isso torna a comparação entre hábitos justa.
    */
   getCompletionRate(history) {
     if (!history) return 0;
@@ -103,8 +119,13 @@ export const HabitService = {
   },
 
   /**
-   * Agrupa quantos hábitos foram concluídos em cada um dos últimos N dias.
-   * Usado pelo Dashboard para o gráfico de barras semanal.
+   * Agrega quantos hábitos foram concluídos em cada dia dos últimos N dias.
+   * Usado pelo DashboardScreen para desenhar o mini gráfico de barras semanal.
+   *
+   * Retorna um array onde cada elemento tem:
+   *  - completed: quantidade de hábitos feitos naquele dia
+   *  - total: total de hábitos existentes
+   *  - percent: porcentagem de conclusão (0-100)
    */
   getDailyAggregates(habits, nDays = 7) {
     const days = DateUtils.lastNDays(nDays);
@@ -112,7 +133,6 @@ export const HabitService = {
       ...day,
       completed: habits.filter((h) => h.history[day.key] === true).length,
       total: habits.length,
-      // Percentual de conclusão naquele dia (0-100)
       percent:
         habits.length > 0
           ? Math.round(
@@ -125,8 +145,8 @@ export const HabitService = {
   },
 
   /**
-   * Estatísticas de hoje: concluídos, total e percentual.
-   * Ponto central de dados para o Dashboard e HomeScreen.
+   * Estatísticas do dia de hoje: quantos hábitos foram feitos, o total
+   * e o percentual de conclusão. Usado no Dashboard e na HomeScreen.
    */
   getTodayStats(habits) {
     const today = DateUtils.todayKey();
@@ -138,7 +158,7 @@ export const HabitService = {
 
   /**
    * Retorna os dados dos últimos N dias com status de conclusão.
-   * Usado para o calendário de histórico na tela de detalhe do hábito.
+   * Uso na tela de detalhes do hábito para montar o calendário de histórico.
    */
   getHistoryDays(history, nDays = 21) {
     return DateUtils.lastNDays(nDays).map((day) => ({
@@ -148,8 +168,9 @@ export const HabitService = {
   },
 
   /**
-   * Retorna uma mensagem motivacional baseada no percentual de conclusão do dia.
-   * Mensagens diferentes evitam que o usuário as ignore por repetição.
+   * Retorna uma mensagem motivacional baseada no % de conclusão do dia.
+   * Coloquei mensagens diferentes para cada faixa para evitar que o usuário
+   * ignore por ver sempre a mesma coisa.
    */
   getMotivationMessage(percent) {
     if (percent === 100) return '🏆 Perfeito! Dia completo!';

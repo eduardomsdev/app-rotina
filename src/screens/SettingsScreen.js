@@ -1,16 +1,24 @@
 /**
- * SettingsScreen.js — Tela 5: Configurações
+ * SettingsScreen.js — Tela 7: Configurações e perfil do usuário.
  *
- * Componentes utilizados: View, Text, Image (avatar do usuário), Switch, TouchableOpacity, ScrollView
- * Layout Flexbox: coluna com seções agrupadas em cards
+ * Essa tela agrupa todas as configurações do app em seções organizadas.
+ * Usei o componente Switch nativo do RN para o toggle de tema, pois ele
+ * já tem o visual correto para cada plataforma (iOS e Android).
  *
- * Funcionalidades:
- *  - Perfil do usuário logado com avatar gerado dinamicamente (componente Image)
- *  - Barra de progresso mostrando % de hábitos concluídos hoje
- *  - Toggle de tema claro/escuro (Switch nativo do RN)
- *  - Estatísticas de hábitos (total / pendentes / feitos hoje)
- *  - Informações do aplicativo
- *  - Botão de logout com confirmação
+ * O que a tela mostra:
+ *  1. Card de perfil com avatar gerado automaticamente (componente Image)
+ *  2. Barra de progresso dos hábitos de hoje
+ *  3. Toggle de tema claro/escuro (Switch nativo)
+ *  4. Grid de estatísticas do dia (total / pendentes / feitos)
+ *  5. Informações sobre o aplicativo
+ *  6. Botão de logout com confirmação
+ *
+ * Componentes RN utilizados:
+ *  - View, Text: estrutura e textos
+ *  - Image: avatar do usuário gerado via ui-avatars.com (requisito acadêmico)
+ *  - Switch: toggle de tema claro/escuro (nativo do RN)
+ *  - TouchableOpacity: botões de ação e linhas de configuração
+ *  - ScrollView: permite scroll se o conteúdo não couber na tela
  */
 import {
   View,
@@ -31,12 +39,14 @@ export default function SettingsScreen() {
   const { user, logout, theme, toggleTheme, habits } = useApp();
   const colors = getTheme(theme);
 
+  // Calcula o progresso de hoje para a barra de progresso
   const today = DateUtils.todayKey();
   const completedCount = habits.filter((h) => h.history[today] === true).length;
   const totalCount = habits.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const handleLogout = () => {
+    // Pede confirmação antes de fazer logout (ação que pode causar perda de contexto)
     Alert.alert(
       'Sair da Conta',
       'Deseja realmente sair? Seus dados ficam salvos para o próximo acesso.',
@@ -49,17 +59,23 @@ export default function SettingsScreen() {
 
   const styles = createStyles(colors);
 
-  // Componente de linha de configuração reutilizável
+  /**
+   * Componente interno reutilizável para cada linha de configuração.
+   * Recebe ícone, label, conteúdo da direita e callback de toque.
+   * Usei esse padrão para evitar repetição de código nas linhas do card "Sobre".
+   */
   const SettingRow = ({ icon, iconBg, label, rightContent, onPress, danger }) => (
     <TouchableOpacity
       style={styles.settingRow}
       onPress={onPress}
-      disabled={!onPress}
+      disabled={!onPress} // se não tem callback, desabilita o toque
       activeOpacity={onPress ? 0.7 : 1}
     >
+      {/* Ícone com fundo colorido */}
       <View style={[styles.settingIconBox, { backgroundColor: iconBg || colors.primaryLight }]}>
         <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.primary} />
       </View>
+      {/* Label da linha — fica vermelho em ações de perigo (logout) */}
       <Text style={[styles.settingLabel, danger && { color: colors.danger }]}>{label}</Text>
       <View style={styles.settingRight}>{rightContent}</View>
     </TouchableOpacity>
@@ -71,12 +87,15 @@ export default function SettingsScreen() {
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      {/* ─── Card de Perfil do Usuário (componente Image) ─── */}
+
+      {/* ─── Card de Perfil com Image (requisito acadêmico) ─── */}
       <View style={styles.profileCard}>
         {/*
-          Image: exibe o avatar do usuário.
-          A URL usa ui-avatars.com para gerar imagem com as iniciais do nome,
-          sem precisar de nenhum arquivo de imagem local.
+          Image: exibe o avatar do usuário gerado automaticamente.
+          A API ui-avatars.com recebe o nome e retorna uma imagem PNG
+          com as iniciais do usuário num fundo colorido.
+          Usei isso para cumprir o requisito do componente Image sem
+          precisar armazenar fotos de perfil localmente.
         */}
         <Image
           source={{
@@ -94,14 +113,14 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* ─── Progresso de Hábitos de Hoje ─── */}
+      {/* ─── Barra de Progresso de Hoje ─── */}
       <View style={styles.progressCard}>
         <View style={styles.progressHeader}>
           <Text style={styles.progressTitle}>Progresso de Hoje</Text>
           <Text style={styles.progressPercent}>{progressPercent}%</Text>
         </View>
 
-        {/* Barra de progresso */}
+        {/* Barra de progresso — fica verde quando 100% */}
         <View style={styles.progressBarBg}>
           <View
             style={[
@@ -128,6 +147,7 @@ export default function SettingsScreen() {
             iconBg={theme === 'dark' ? '#2A2840' : '#FFF9E6'}
             label="Tema Escuro"
             rightContent={
+              // Switch nativo do React Native — visual diferente no iOS e Android
               <Switch
                 value={theme === 'dark'}
                 onValueChange={toggleTheme}
@@ -140,9 +160,10 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* ─── Estatísticas ─── */}
+      {/* ─── Estatísticas do Dia ─── */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Estatísticas de Hoje</Text>
+        {/* Grid de 3 cards lado a lado (Flexbox row) */}
         <View style={styles.statsGrid}>
           {[
             { label: 'Total', value: totalCount, icon: '🌱', bg: colors.primaryLight, color: colors.primary },
@@ -158,7 +179,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* ─── Sobre o App ─── */}
+      {/* ─── Informações do Aplicativo ─── */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Sobre o Aplicativo</Text>
         <View style={styles.card}>
@@ -188,7 +209,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* ─── Sair ─── */}
+      {/* ─── Logout ─── */}
       <View style={styles.section}>
         <View style={styles.card}>
           <SettingRow
@@ -204,7 +225,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Rodapé */}
+      {/* Rodapé com créditos */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>AppRotina © 2025</Text>
         <Text style={styles.footerText}>Feito com React Native + Expo</Text>
@@ -222,9 +243,9 @@ const createStyles = (colors) =>
     scrollContent: {
       paddingBottom: 40,
     },
-    // ─── Perfil ───
+    // ─── Card de Perfil ───
     profileCard: {
-      flexDirection: 'row',
+      flexDirection: 'row', // avatar + info lado a lado (Flexbox)
       alignItems: 'center',
       backgroundColor: colors.card,
       margin: 16,
@@ -267,7 +288,7 @@ const createStyles = (colors) =>
       color: colors.primary,
       fontWeight: '600',
     },
-    // ─── Progresso ───
+    // ─── Barra de Progresso ───
     progressCard: {
       backgroundColor: colors.card,
       marginHorizontal: 16,
@@ -303,7 +324,6 @@ const createStyles = (colors) =>
     },
     progressBarFill: {
       height: 8,
-      backgroundColor: colors.primary,
       borderRadius: 4,
     },
     progressSubtext: {
@@ -367,11 +387,11 @@ const createStyles = (colors) =>
     rowDivider: {
       height: 1,
       backgroundColor: colors.border,
-      marginLeft: 62,
+      marginLeft: 62, // alinhado com o texto, não com o ícone
     },
     // ─── Grid de estatísticas ───
     statsGrid: {
-      flexDirection: 'row',
+      flexDirection: 'row', // três cards lado a lado (Flexbox)
       gap: 10,
     },
     statCard: {

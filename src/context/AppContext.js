@@ -1,44 +1,56 @@
 /**
- * AppContext.js — Estado global: hábitos, autenticação e tema.
+ * AppContext.js — Estado global da aplicação (hábitos, autenticação e tema).
  *
- * Mudanças em relação à versão anterior:
- *  - "tasks" substituído por "habits" (com modelo novo: icon, color, history)
- *  - toggleHabitToday: marca/desmarca o hábito no dia atual
- *  - Validação de segurança em TODOS os inputs (usa security.js)
- *  - Senhas NUNCA salvas no AsyncStorage (apenas dados não-sensíveis)
+ * Usei a Context API do React para disponibilizar o estado global para todas
+ * as telas sem precisar passar props manualmente de componente em componente.
  *
- * Modelo de hábito:
+ * O que fica nesse contexto:
+ *  - user: dados do usuário logado (nome, email — sem senha)
+ *  - habits: lista de todos os hábitos do usuário
+ *  - theme: 'light' ou 'dark'
+ *  - Funções: login, register, logout, addHabit, updateHabit, deleteHabit,
+ *             toggleHabitToday, toggleTheme
+ *
+ * Modelo de um hábito:
  *  {
- *    id: string,
- *    name: string,        // nome do hábito (ex: "Beber água")
- *    description: string, // descrição opcional
- *    icon: string,        // emoji (ex: "💧")
- *    color: string,       // hex (ex: "#45B7D1")
- *    createdAt: string,   // ISO date string
- *    history: {           // registro de conclusões por dia
+ *    id: string,            → identificador único (timestamp)
+ *    name: string,          → nome do hábito (ex: "Beber água")
+ *    description: string,   → descrição opcional
+ *    icon: string,          → emoji (ex: "💧")
+ *    color: string,         → cor hex (ex: "#45B7D1")
+ *    createdAt: string,     → data de criação em formato ISO
+ *    history: {             → registro diário de conclusões
  *      'YYYY-MM-DD': boolean
  *    }
  *  }
+ *
+ * Segurança implementada:
+ *  - Senhas NUNCA são salvas no AsyncStorage
+ *  - Todos os inputs passam pela validação do security.js antes de persistir
+ *  - As chaves do AsyncStorage têm prefixo 'v2' para não conflitar com versões antigas
  */
 import { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DateUtils } from '../utils/dateUtils';
 import { Security } from '../utils/security';
 
+// Cria o contexto vazio — o valor real é passado pelo AppProvider
 const AppContext = createContext({});
 
-// Usuários pré-cadastrados para demonstração
+// Usuários de demonstração para facilitar o teste do app
 const DEMO_USERS = [
   { id: '1', name: 'João Silva', email: 'joao@email.com', password: '123456' },
   { id: '2', name: 'Maria Souza', email: 'maria@email.com', password: '123456' },
 ];
 
-// Gera chave de data para N dias atrás (necessário antes do const INITIAL_HABITS)
+// Função auxiliar para gerar chave de data N dias atrás
+// Precisa estar antes do INITIAL_HABITS porque ele usa essa função
 function d(n) {
   return DateUtils.daysAgoKey(n);
 }
 
-// Hábitos iniciais de demonstração com histórico pré-populado para o Dashboard parecer rico
+// Hábitos de exemplo carregados na primeira execução do app
+// Já vêm com histórico pré-populado para o Dashboard ter dados para exibir
 const INITIAL_HABITS = [
   {
     id: '1',
@@ -90,7 +102,7 @@ const INITIAL_HABITS = [
   },
 ];
 
-// Chaves do AsyncStorage (prefixo 'v2' para não conflitar com dados da versão anterior)
+// Chaves do AsyncStorage com prefixo 'v2' para não conflitar com versões antigas
 const KEYS = {
   USER: '@appRotina:v2:user',
   HABITS: '@appRotina:v2:habits',
@@ -98,18 +110,23 @@ const KEYS = {
   USERS: '@appRotina:v2:users',
 };
 
+// AppProvider: componente que envolve todo o app e fornece o estado global
 export function AppProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [habits, setHabits] = useState([]);
-  const [theme, setTheme] = useState('light');
-  const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState(DEMO_USERS);
+  const [user, setUser] = useState(null);       // usuário logado (ou null)
+  const [habits, setHabits] = useState([]);      // lista de hábitos
+  const [theme, setTheme] = useState('light');   // tema atual
+  const [loading, setLoading] = useState(true);  // carregando dados do storage
+  const [users, setUsers] = useState(DEMO_USERS); // base de usuários (demo)
 
+  // Ao abrir o app, carrega os dados salvos no AsyncStorage
   useEffect(() => {
     loadStoredData();
   }, []);
 
-  // Carrega dados persistidos na inicialização
+  /**
+   * Carrega todos os dados persistidos de uma vez usando Promise.all.
+   * Isso é mais eficiente do que fazer uma leitura de cada vez.
+   */
   const loadStoredData = async () => {
     try {
       const [storedUser, storedHabits, storedTheme, storedUsers] = await Promise.all([
@@ -120,20 +137,20 @@ export function AppProvider({ children }) {
       ]);
 
       if (storedUser) setUser(JSON.parse(storedUser));
+      // Se não há hábitos salvos (primeira execução), usa os exemplos
       if (storedHabits) setHabits(JSON.parse(storedHabits));
-      else setHabits(INITIAL_HABITS); // Primeira execução: carrega exemplos
+      else setHabits(INITIAL_HABITS);
       if (storedTheme) setTheme(storedTheme);
       if (storedUsers) setUsers(JSON.parse(storedUsers));
     } catch (error) {
-      // Segurança: nunca logar detalhes do erro em produção
       Security.safeLog({ context: 'loadStoredData', error: error.message });
-      setHabits(INITIAL_HABITS);
+      setHabits(INITIAL_HABITS); // fallback seguro em caso de erro
     } finally {
-      setLoading(false);
+      setLoading(false); // libera a tela de loading independente do resultado
     }
   };
 
-  // Persiste array de hábitos no AsyncStorage
+  // Salva o array de hábitos no AsyncStorage após qualquer modificação
   const persistHabits = async (newHabits) => {
     try {
       await AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(newHabits));
@@ -142,10 +159,14 @@ export function AppProvider({ children }) {
     }
   };
 
-  // ─── AUTENTICAÇÃO ─────────────────────────────────────────────
+  // ─── AUTENTICAÇÃO ─────────────────────────────────────────────────────────
 
+  /**
+   * Login: valida o email e busca o usuário na lista.
+   * A mensagem de erro é genérica para não revelar se o problema
+   * está no email ou na senha (boa prática de segurança).
+   */
   const login = async (email, password) => {
-    // Valida formato do email antes de consultar a "base"
     if (!Security.validateEmail(email)) {
       return { success: false, message: 'Formato de email inválido.' };
     }
@@ -155,19 +176,22 @@ export function AppProvider({ children }) {
     );
 
     if (found) {
-      // SEGURANÇA: salvar apenas dados não-sensíveis (sem senha)
+      // Salvo só os dados não-sensíveis — a senha nunca vai para o AsyncStorage
       const userData = { id: found.id, name: found.name, email: found.email };
       setUser(userData);
       await AsyncStorage.setItem(KEYS.USER, JSON.stringify(userData));
       return { success: true };
     }
 
-    // Mensagem genérica: não revelar se o erro é no email ou na senha
     return { success: false, message: 'Email ou senha incorretos.' };
   };
 
+  /**
+   * Cadastro: valida todos os campos com o security.js e cria o novo usuário.
+   * Em um app real de produção, isso seria feito no backend com hash de senha.
+   */
   const register = async (name, email, password) => {
-    // Validação completa com security.js
+    // Valida cada campo individualmente para poder dar mensagens de erro específicas
     const nameV = Security.validateName(name);
     if (!nameV.valid) return { success: false, message: nameV.message };
 
@@ -186,32 +210,35 @@ export function AppProvider({ children }) {
     const newUser = { id: Date.now().toString(), name: nameV.value, email: emailLower, password };
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
-    // Persiste usuários (em produção real: usar backend seguro, nunca armazenar senha localmente)
     await AsyncStorage.setItem(KEYS.USERS, JSON.stringify(updatedUsers));
 
+    // Loga automaticamente após o cadastro
     const userData = { id: newUser.id, name: newUser.name, email: newUser.email };
     setUser(userData);
     await AsyncStorage.setItem(KEYS.USER, JSON.stringify(userData));
     return { success: true };
   };
 
+  // Remove o usuário do estado e do storage (os hábitos permanecem)
   const logout = async () => {
     setUser(null);
     await AsyncStorage.removeItem(KEYS.USER);
   };
 
-  // ─── CRUD DE HÁBITOS ──────────────────────────────────────────
+  // ─── CRUD DE HÁBITOS ──────────────────────────────────────────────────────
 
+  /**
+   * Cria um novo hábito após validar e sanitizar todos os campos.
+   * A cor e o ícone passam por validação adicional para garantir que
+   * apenas valores seguros sejam aplicados nos estilos.
+   */
   const addHabit = async (habitData) => {
-    // Valida e sanitiza inputs
     const nameV = Security.validateHabitName(habitData.name);
     if (!nameV.valid) return { success: false, message: nameV.message };
 
-    // Valida cor e ícone (evita valores malformados nos estilos)
-    const safeColor =
-      Security.isValidHexColor(habitData.color) ? habitData.color : '#6C63FF';
-    const safeIcon =
-      Security.isValidIcon(habitData.icon) ? habitData.icon : '📋';
+    // Se a cor ou o ícone forem inválidos, usa um valor padrão seguro
+    const safeColor = Security.isValidHexColor(habitData.color) ? habitData.color : '#6C63FF';
+    const safeIcon = Security.isValidIcon(habitData.icon) ? habitData.icon : '📋';
 
     const newHabit = {
       id: Date.now().toString(),
@@ -220,15 +247,19 @@ export function AppProvider({ children }) {
       icon: safeIcon,
       color: safeColor,
       createdAt: new Date().toISOString(),
-      history: {}, // histórico começa vazio
+      history: {}, // histórico vazio — o usuário começa a marcar a partir de hoje
     };
 
-    const updatedHabits = [newHabit, ...habits];
+    const updatedHabits = [newHabit, ...habits]; // novo hábito aparece no topo
     setHabits(updatedHabits);
     await persistHabits(updatedHabits);
     return { success: true, habit: newHabit };
   };
 
+  /**
+   * Atualiza um hábito existente.
+   * Só valida e atualiza os campos que foram passados (updates parciais).
+   */
   const updateHabit = async (id, updates) => {
     const sanitizedUpdates = {};
 
@@ -247,6 +278,7 @@ export function AppProvider({ children }) {
       sanitizedUpdates.color = updates.color;
     }
 
+    // Cria novo array com o hábito atualizado (imutabilidade)
     const updatedHabits = habits.map((h) =>
       h.id === id ? { ...h, ...sanitizedUpdates } : h
     );
@@ -255,19 +287,25 @@ export function AppProvider({ children }) {
     return { success: true };
   };
 
+  // Remove o hábito e todo o seu histórico permanentemente
   const deleteHabit = async (id) => {
     const updatedHabits = habits.filter((h) => h.id !== id);
     setHabits(updatedHabits);
     await persistHabits(updatedHabits);
   };
 
-  // Marca/desmarca o hábito como concluído no dia atual
+  /**
+   * Marca ou desmarca o hábito como concluído no dia atual.
+   * Funciona como toggle: se já estava feito, desfaz; se não estava, marca.
+   *
+   * Usei imutabilidade aqui: crio um novo objeto history em vez de
+   * modificar o existente, o que é a forma correta de atualizar estado no React.
+   */
   const toggleHabitToday = async (id) => {
     const today = DateUtils.todayKey();
     const updatedHabits = habits.map((h) => {
       if (h.id !== id) return h;
       const wasCompleted = h.history[today] === true;
-      // Imutabilidade: cria novo objeto history em vez de mutar o existente
       const newHistory = { ...h.history, [today]: !wasCompleted };
       return { ...h, history: newHistory };
     });
@@ -275,8 +313,9 @@ export function AppProvider({ children }) {
     await persistHabits(updatedHabits);
   };
 
-  // ─── TEMA ─────────────────────────────────────────────────────
+  // ─── TEMA ──────────────────────────────────────────────────────────────────
 
+  // Alterna entre tema claro e escuro e persiste a preferência
   const toggleTheme = async () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
@@ -305,7 +344,11 @@ export function AppProvider({ children }) {
   );
 }
 
-// Hook customizado — importar em qualquer componente para acessar o estado global
+/**
+ * Hook personalizado para acessar o contexto global.
+ * Em vez de importar AppContext e useContext em cada tela,
+ * basta importar esse hook: const { habits, theme } = useApp();
+ */
 export function useApp() {
   return useContext(AppContext);
 }
