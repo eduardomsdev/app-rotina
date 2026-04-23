@@ -94,7 +94,7 @@ app-rotina/
 
 **1. Clone o repositório**
 ```bash
-git clone https://github.com/seu-usuario/app-rotina.git
+git clone https://github.com/eduardomsdev/app-rotina.git
 cd app-rotina
 ```
 
