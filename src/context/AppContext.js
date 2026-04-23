@@ -1,16 +1,29 @@
 /**
- * AppContext.js — Gerenciamento de estado global com Context API.
+ * AppContext.js — Estado global: hábitos, autenticação e tema.
  *
- * Responsabilidades:
- *  - Autenticação: login, cadastro, logout
- *  - CRUD de tarefas: adicionar, atualizar, excluir, marcar como concluída
- *  - Preferência de tema (claro/escuro)
- *  - Persistência de dados via AsyncStorage
+ * Mudanças em relação à versão anterior:
+ *  - "tasks" substituído por "habits" (com modelo novo: icon, color, history)
+ *  - toggleHabitToday: marca/desmarca o hábito no dia atual
+ *  - Validação de segurança em TODOS os inputs (usa security.js)
+ *  - Senhas NUNCA salvas no AsyncStorage (apenas dados não-sensíveis)
  *
- * Padrão: Provider + hook personalizado (useApp)
+ * Modelo de hábito:
+ *  {
+ *    id: string,
+ *    name: string,        // nome do hábito (ex: "Beber água")
+ *    description: string, // descrição opcional
+ *    icon: string,        // emoji (ex: "💧")
+ *    color: string,       // hex (ex: "#45B7D1")
+ *    createdAt: string,   // ISO date string
+ *    history: {           // registro de conclusões por dia
+ *      'YYYY-MM-DD': boolean
+ *    }
+ *  }
  */
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DateUtils } from '../utils/dateUtils';
+import { Security } from '../utils/security';
 
 const AppContext = createContext({});
 
@@ -20,120 +33,160 @@ const DEMO_USERS = [
   { id: '2', name: 'Maria Souza', email: 'maria@email.com', password: '123456' },
 ];
 
-// Tarefas iniciais de exemplo carregadas no primeiro uso do app
-const INITIAL_TASKS = [
+// Gera chave de data para N dias atrás (necessário antes do const INITIAL_HABITS)
+function d(n) {
+  return DateUtils.daysAgoKey(n);
+}
+
+// Hábitos iniciais de demonstração com histórico pré-populado para o Dashboard parecer rico
+const INITIAL_HABITS = [
   {
     id: '1',
-    title: 'Estudar React Native',
-    description: 'Revisar componentes, hooks, navegação e Context API',
-    completed: false,
-    priority: 'high',
-    createdAt: new Date().toISOString(),
+    name: 'Beber 2L de água',
+    description: 'Manter hidratação ao longo do dia',
+    icon: '💧',
+    color: '#45B7D1',
+    createdAt: new Date(Date.now() - 14 * 864e5).toISOString(),
+    history: {
+      [d(6)]: true, [d(5)]: true, [d(4)]: true,
+      [d(3)]: false, [d(2)]: true, [d(1)]: true,
+    },
   },
   {
     id: '2',
-    title: 'Fazer exercícios físicos',
-    description: '30 minutos de caminhada pela manhã antes do trabalho',
-    completed: true,
-    priority: 'medium',
-    createdAt: new Date().toISOString(),
+    name: 'Meditação matinal',
+    description: '10 minutos ao acordar',
+    icon: '🧘',
+    color: '#DDA0DD',
+    createdAt: new Date(Date.now() - 10 * 864e5).toISOString(),
+    history: {
+      [d(5)]: true, [d(4)]: true,
+      [d(3)]: true, [d(2)]: true, [d(1)]: true,
+    },
   },
   {
     id: '3',
-    title: 'Ler um livro',
-    description: 'Continuar a leitura do capítulo 5 — "Clean Code"',
-    completed: false,
-    priority: 'low',
-    createdAt: new Date().toISOString(),
+    name: 'Leitura diária',
+    description: 'Ler pelo menos 20 páginas',
+    icon: '📚',
+    color: '#FF6B6B',
+    createdAt: new Date(Date.now() - 20 * 864e5).toISOString(),
+    history: {
+      [d(6)]: true, [d(5)]: false, [d(4)]: true,
+      [d(3)]: true, [d(2)]: false, [d(1)]: true,
+    },
   },
   {
     id: '4',
-    title: 'Entregar trabalho acadêmico',
-    description: 'Finalizar e enviar o projeto de React Native para a faculdade',
-    completed: false,
-    priority: 'high',
-    createdAt: new Date().toISOString(),
+    name: 'Exercício físico',
+    description: '30 minutos de atividade',
+    icon: '🏃',
+    color: '#4ECDC4',
+    createdAt: new Date(Date.now() - 5 * 864e5).toISOString(),
+    history: {
+      [d(4)]: true, [d(3)]: true,
+      [d(2)]: true, [d(1)]: false,
+    },
   },
 ];
 
-// Chaves do AsyncStorage
+// Chaves do AsyncStorage (prefixo 'v2' para não conflitar com dados da versão anterior)
 const KEYS = {
-  USER: '@appRotina:user',
-  TASKS: '@appRotina:tasks',
-  THEME: '@appRotina:theme',
-  USERS: '@appRotina:users',
+  USER: '@appRotina:v2:user',
+  HABITS: '@appRotina:v2:habits',
+  THEME: '@appRotina:v2:theme',
+  USERS: '@appRotina:v2:users',
 };
 
 export function AppProvider({ children }) {
-  const [user, setUser] = useState(null);       // Usuário logado (ou null)
-  const [tasks, setTasks] = useState([]);        // Lista de tarefas
-  const [theme, setTheme] = useState('light');   // 'light' | 'dark'
-  const [loading, setLoading] = useState(true);  // Carregando dados iniciais
-  const [users, setUsers] = useState(DEMO_USERS); // Usuários cadastrados
+  const [user, setUser] = useState(null);
+  const [habits, setHabits] = useState([]);
+  const [theme, setTheme] = useState('light');
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState(DEMO_USERS);
 
-  // Carrega os dados persistidos quando o app é aberto
   useEffect(() => {
     loadStoredData();
   }, []);
 
+  // Carrega dados persistidos na inicialização
   const loadStoredData = async () => {
     try {
-      const [storedUser, storedTasks, storedTheme, storedUsers] = await Promise.all([
+      const [storedUser, storedHabits, storedTheme, storedUsers] = await Promise.all([
         AsyncStorage.getItem(KEYS.USER),
-        AsyncStorage.getItem(KEYS.TASKS),
+        AsyncStorage.getItem(KEYS.HABITS),
         AsyncStorage.getItem(KEYS.THEME),
         AsyncStorage.getItem(KEYS.USERS),
       ]);
 
       if (storedUser) setUser(JSON.parse(storedUser));
-      if (storedTasks) setTasks(JSON.parse(storedTasks));
-      else setTasks(INITIAL_TASKS); // primeira vez: carrega as tarefas de exemplo
+      if (storedHabits) setHabits(JSON.parse(storedHabits));
+      else setHabits(INITIAL_HABITS); // Primeira execução: carrega exemplos
       if (storedTheme) setTheme(storedTheme);
       if (storedUsers) setUsers(JSON.parse(storedUsers));
     } catch (error) {
-      console.log('[AppContext] Erro ao carregar dados:', error);
-      setTasks(INITIAL_TASKS);
+      // Segurança: nunca logar detalhes do erro em produção
+      Security.safeLog({ context: 'loadStoredData', error: error.message });
+      setHabits(INITIAL_HABITS);
     } finally {
       setLoading(false);
     }
   };
 
-  // Persiste o array de tarefas no AsyncStorage
-  const persistTasks = async (newTasks) => {
+  // Persiste array de hábitos no AsyncStorage
+  const persistHabits = async (newHabits) => {
     try {
-      await AsyncStorage.setItem(KEYS.TASKS, JSON.stringify(newTasks));
+      await AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(newHabits));
     } catch (error) {
-      console.log('[AppContext] Erro ao salvar tarefas:', error);
+      Security.safeLog({ context: 'persistHabits', error: error.message });
     }
   };
 
-  // ─── AUTENTICAÇÃO ──────────────────────────────────────────────
+  // ─── AUTENTICAÇÃO ─────────────────────────────────────────────
 
-  // LOGIN: verifica email e senha entre os usuários cadastrados
   const login = async (email, password) => {
+    // Valida formato do email antes de consultar a "base"
+    if (!Security.validateEmail(email)) {
+      return { success: false, message: 'Formato de email inválido.' };
+    }
+
     const found = users.find(
       (u) => u.email === email.toLowerCase().trim() && u.password === password
     );
+
     if (found) {
+      // SEGURANÇA: salvar apenas dados não-sensíveis (sem senha)
       const userData = { id: found.id, name: found.name, email: found.email };
       setUser(userData);
       await AsyncStorage.setItem(KEYS.USER, JSON.stringify(userData));
       return { success: true };
     }
+
+    // Mensagem genérica: não revelar se o erro é no email ou na senha
     return { success: false, message: 'Email ou senha incorretos.' };
   };
 
-  // CADASTRO: valida unicidade do email e cria novo usuário
   const register = async (name, email, password) => {
+    // Validação completa com security.js
+    const nameV = Security.validateName(name);
+    if (!nameV.valid) return { success: false, message: nameV.message };
+
+    if (!Security.validateEmail(email)) {
+      return { success: false, message: 'Formato de email inválido.' };
+    }
+
+    const passV = Security.validatePassword(password);
+    if (!passV.valid) return { success: false, message: passV.message };
+
     const emailLower = email.toLowerCase().trim();
-    const exists = users.find((u) => u.email === emailLower);
-    if (exists) {
+    if (users.find((u) => u.email === emailLower)) {
       return { success: false, message: 'Este email já está cadastrado.' };
     }
 
-    const newUser = { id: Date.now().toString(), name, email: emailLower, password };
+    const newUser = { id: Date.now().toString(), name: nameV.value, email: emailLower, password };
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
+    // Persiste usuários (em produção real: usar backend seguro, nunca armazenar senha localmente)
     await AsyncStorage.setItem(KEYS.USERS, JSON.stringify(updatedUsers));
 
     const userData = { id: newUser.id, name: newUser.name, email: newUser.email };
@@ -142,56 +195,87 @@ export function AppProvider({ children }) {
     return { success: true };
   };
 
-  // LOGOUT: remove sessão do usuário
   const logout = async () => {
     setUser(null);
     await AsyncStorage.removeItem(KEYS.USER);
   };
 
-  // ─── CRUD DE TAREFAS ───────────────────────────────────────────
+  // ─── CRUD DE HÁBITOS ──────────────────────────────────────────
 
-  // ADICIONAR nova tarefa no início da lista
-  const addTask = async (taskData) => {
-    const newTask = {
+  const addHabit = async (habitData) => {
+    // Valida e sanitiza inputs
+    const nameV = Security.validateHabitName(habitData.name);
+    if (!nameV.valid) return { success: false, message: nameV.message };
+
+    // Valida cor e ícone (evita valores malformados nos estilos)
+    const safeColor =
+      Security.isValidHexColor(habitData.color) ? habitData.color : '#6C63FF';
+    const safeIcon =
+      Security.isValidIcon(habitData.icon) ? habitData.icon : '📋';
+
+    const newHabit = {
       id: Date.now().toString(),
-      title: taskData.title,
-      description: taskData.description || '',
-      priority: taskData.priority || 'medium',
-      completed: false,
+      name: nameV.value,
+      description: Security.sanitizeDescription(habitData.description),
+      icon: safeIcon,
+      color: safeColor,
       createdAt: new Date().toISOString(),
+      history: {}, // histórico começa vazio
     };
-    const updatedTasks = [newTask, ...tasks];
-    setTasks(updatedTasks);
-    await persistTasks(updatedTasks);
-    return newTask;
+
+    const updatedHabits = [newHabit, ...habits];
+    setHabits(updatedHabits);
+    await persistHabits(updatedHabits);
+    return { success: true, habit: newHabit };
   };
 
-  // ATUALIZAR campos de uma tarefa existente
-  const updateTask = async (id, updates) => {
-    const updatedTasks = tasks.map((task) =>
-      task.id === id ? { ...task, ...updates } : task
+  const updateHabit = async (id, updates) => {
+    const sanitizedUpdates = {};
+
+    if (updates.name !== undefined) {
+      const v = Security.validateHabitName(updates.name);
+      if (!v.valid) return { success: false, message: v.message };
+      sanitizedUpdates.name = v.value;
+    }
+    if (updates.description !== undefined) {
+      sanitizedUpdates.description = Security.sanitizeDescription(updates.description);
+    }
+    if (updates.icon !== undefined && Security.isValidIcon(updates.icon)) {
+      sanitizedUpdates.icon = updates.icon;
+    }
+    if (updates.color !== undefined && Security.isValidHexColor(updates.color)) {
+      sanitizedUpdates.color = updates.color;
+    }
+
+    const updatedHabits = habits.map((h) =>
+      h.id === id ? { ...h, ...sanitizedUpdates } : h
     );
-    setTasks(updatedTasks);
-    await persistTasks(updatedTasks);
+    setHabits(updatedHabits);
+    await persistHabits(updatedHabits);
+    return { success: true };
   };
 
-  // EXCLUIR tarefa pelo id
-  const deleteTask = async (id) => {
-    const updatedTasks = tasks.filter((task) => task.id !== id);
-    setTasks(updatedTasks);
-    await persistTasks(updatedTasks);
+  const deleteHabit = async (id) => {
+    const updatedHabits = habits.filter((h) => h.id !== id);
+    setHabits(updatedHabits);
+    await persistHabits(updatedHabits);
   };
 
-  // MARCAR/DESMARCAR como concluída (toggle)
-  const toggleTaskComplete = async (id) => {
-    const updatedTasks = tasks.map((task) =>
-      task.id === id ? { ...task, completed: !task.completed } : task
-    );
-    setTasks(updatedTasks);
-    await persistTasks(updatedTasks);
+  // Marca/desmarca o hábito como concluído no dia atual
+  const toggleHabitToday = async (id) => {
+    const today = DateUtils.todayKey();
+    const updatedHabits = habits.map((h) => {
+      if (h.id !== id) return h;
+      const wasCompleted = h.history[today] === true;
+      // Imutabilidade: cria novo objeto history em vez de mutar o existente
+      const newHistory = { ...h.history, [today]: !wasCompleted };
+      return { ...h, history: newHistory };
+    });
+    setHabits(updatedHabits);
+    await persistHabits(updatedHabits);
   };
 
-  // ─── TEMA ──────────────────────────────────────────────────────
+  // ─── TEMA ─────────────────────────────────────────────────────
 
   const toggleTheme = async () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
@@ -203,16 +287,16 @@ export function AppProvider({ children }) {
     <AppContext.Provider
       value={{
         user,
-        tasks,
+        habits,
         theme,
         loading,
         login,
         register,
         logout,
-        addTask,
-        updateTask,
-        deleteTask,
-        toggleTaskComplete,
+        addHabit,
+        updateHabit,
+        deleteHabit,
+        toggleHabitToday,
         toggleTheme,
       }}
     >
@@ -221,7 +305,7 @@ export function AppProvider({ children }) {
   );
 }
 
-// Hook personalizado — importar em qualquer componente para acessar o estado global
+// Hook customizado — importar em qualquer componente para acessar o estado global
 export function useApp() {
   return useContext(AppContext);
 }

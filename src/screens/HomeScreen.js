@@ -1,60 +1,50 @@
 /**
- * HomeScreen.js — Tela 2: Lista de Tarefas (tela principal)
+ * HomeScreen.js — Tela "Hoje": lista de hábitos do dia.
  *
- * Componentes utilizados: View, Text, TextInput (busca), FlatList, TouchableOpacity
- * Layout Flexbox: coluna principal, row para estatísticas e filtros
- *
- * Funcionalidades:
- *  - Saudação personalizada com o nome do usuário logado
- *  - Cards de estatísticas (pendentes / concluídas)
+ * Mudanças em relação à versão de tarefas:
+ *  - "tasks" substituído por "habits"
+ *  - FlatList usa HabitCard (com pontos de histórico e streak)
+ *  - Filtros: Todos / Pendentes / Concluídos
  *  - Campo de busca em tempo real
- *  - Filtros: Todas / Pendentes / Concluídas
- *  - FlatList com TaskCard para cada tarefa
- *  - FAB (Floating Action Button) para adicionar nova tarefa
+ *  - Stats cards no topo (concluídos / pendentes)
+ *  - FAB (botão flutuante) para adicionar novo hábito
  */
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { getTheme } from '../utils/themes';
-import TaskCard from '../components/TaskCard';
+import { HabitService } from '../services/habitService';
+import { DateUtils } from '../utils/dateUtils';
+import HabitCard from '../components/HabitCard';
 import EmptyList from '../components/EmptyList';
 
 export default function HomeScreen({ navigation }) {
-  const { tasks, user, theme } = useApp();
+  const { habits, user, theme } = useApp();
   const colors = getTheme(theme);
 
-  const [searchText, setSearchText] = useState('');
-  const [filter, setFilter] = useState('all'); // 'all' | 'pending' | 'completed'
+  const [searchText, setSearchText] = require('react').useState('');
+  const [filter, setFilter] = require('react').useState('all');
 
-  // Filtra as tarefas combinando texto de busca e status
-  const filteredTasks = tasks.filter((task) => {
+  const stats = HabitService.getTodayStats(habits);
+  const today = DateUtils.todayKey();
+
+  // Filtra hábitos por texto de busca e status de conclusão
+  const filteredHabits = habits.filter((h) => {
     const matchesSearch =
-      task.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchText.toLowerCase());
+      h.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      h.description.toLowerCase().includes(searchText.toLowerCase());
 
     const matchesFilter =
       filter === 'all' ||
-      (filter === 'pending' && !task.completed) ||
-      (filter === 'completed' && task.completed);
+      (filter === 'pending' && !h.history[today]) ||
+      (filter === 'completed' && h.history[today] === true);
 
     return matchesSearch && matchesFilter;
   });
 
-  const completedCount = tasks.filter((t) => t.completed).length;
-  const pendingCount = tasks.filter((t) => !t.completed).length;
-
   const styles = createStyles(colors);
 
-  // Botão de filtro reutilizável
-  const FilterButton = ({ label, value, count }) => (
+  const FilterButton = ({ label, value }) => (
     <TouchableOpacity
       style={[styles.filterBtn, filter === value && styles.filterBtnActive]}
       onPress={() => setFilter(value)}
@@ -73,30 +63,33 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.greetingRow}>
           <View>
             <Text style={styles.greeting}>
-              Olá, {user?.name?.split(' ')[0] || 'usuário'}! 👋
+              {DateUtils.fullDayName().charAt(0).toUpperCase() +
+                DateUtils.fullDayName().slice(1)} 🌟
             </Text>
             <Text style={styles.greetingSubtitle}>
-              {pendingCount > 0
-                ? `${pendingCount} tarefa${pendingCount !== 1 ? 's' : ''} pendente${pendingCount !== 1 ? 's' : ''}`
-                : 'Tudo em dia! Continue assim 🎉'}
+              {stats.completed > 0
+                ? `${stats.completed} de ${stats.total} hábitos feitos`
+                : `${stats.total} hábito${stats.total !== 1 ? 's' : ''} para hoje`}
             </Text>
           </View>
-          <Ionicons name="checkmark-done-circle" size={40} color={colors.primaryLight} />
+          <Ionicons name="leaf-outline" size={36} color={colors.primaryLight} />
         </View>
 
-        {/* Cards de estatísticas — layout em row com Flexbox */}
+        {/* Cards de estatísticas em Flexbox row */}
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: colors.primaryLight }]}>
-            <Text style={[styles.statNumber, { color: colors.primary }]}>{pendingCount}</Text>
-            <Text style={[styles.statLabel, { color: colors.primary }]}>Pendentes</Text>
-          </View>
           <View style={[styles.statCard, { backgroundColor: colors.successLight }]}>
-            <Text style={[styles.statNumber, { color: colors.success }]}>{completedCount}</Text>
-            <Text style={[styles.statLabel, { color: colors.success }]}>Concluídas</Text>
+            <Text style={[styles.statNumber, { color: colors.success }]}>{stats.completed}</Text>
+            <Text style={[styles.statLabel, { color: colors.success }]}>Feitos</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.warningLight }]}>
-            <Text style={[styles.statNumber, { color: colors.warning }]}>{tasks.length}</Text>
-            <Text style={[styles.statLabel, { color: colors.warning }]}>Total</Text>
+            <Text style={[styles.statNumber, { color: colors.warning }]}>
+              {stats.total - stats.completed}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.warning }]}>Pendentes</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.primaryLight }]}>
+            <Text style={[styles.statNumber, { color: colors.primary }]}>{stats.percent}%</Text>
+            <Text style={[styles.statLabel, { color: colors.primary }]}>Progresso</Text>
           </View>
         </View>
       </View>
@@ -106,7 +99,7 @@ export default function HomeScreen({ navigation }) {
         <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar tarefas..."
+          placeholder="Buscar hábitos..."
           placeholderTextColor={colors.placeholder}
           value={searchText}
           onChangeText={setSearchText}
@@ -118,38 +111,36 @@ export default function HomeScreen({ navigation }) {
         )}
       </View>
 
-      {/* ─── Filtros de status ─── */}
+      {/* ─── Filtros ─── */}
       <View style={styles.filterRow}>
-        <FilterButton label="Todas" value="all" />
+        <FilterButton label="Todos" value="all" />
         <FilterButton label="Pendentes" value="pending" />
-        <FilterButton label="Concluídas" value="completed" />
+        <FilterButton label="Concluídos" value="completed" />
       </View>
 
-      {/* Contador de resultados visíveis */}
       <Text style={styles.resultCount}>
-        {filteredTasks.length} tarefa{filteredTasks.length !== 1 ? 's' : ''}
+        {filteredHabits.length} hábito{filteredHabits.length !== 1 ? 's' : ''}
       </Text>
 
-      {/* ─── FlatList de tarefas ─── */}
+      {/* ─── FlatList de hábitos ─── */}
       <FlatList
-        data={filteredTasks}
+        data={filteredHabits}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TaskCard
-            task={item}
-            onPress={() => navigation.navigate('TaskDetail', { taskId: item.id })}
+          <HabitCard
+            habit={item}
+            onPress={() => navigation.navigate('HabitDetail', { habitId: item.id })}
           />
         )}
-        // Componente exibido quando a lista está vazia
         ListEmptyComponent={<EmptyList searchText={searchText} filter={filter} />}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
 
-      {/* ─── FAB: botão flutuante para adicionar nova tarefa ─── */}
+      {/* ─── FAB para adicionar novo hábito ─── */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => navigation.navigate('AddTask')}
+        onPress={() => navigation.navigate('AddHabit')}
         activeOpacity={0.8}
       >
         <Ionicons name="add" size={30} color="#FFFFFF" />
@@ -164,7 +155,6 @@ const createStyles = (colors) =>
       flex: 1,
       backgroundColor: colors.background,
     },
-    // ─── Header ───
     header: {
       backgroundColor: colors.card,
       padding: 20,
@@ -182,16 +172,16 @@ const createStyles = (colors) =>
       marginBottom: 14,
     },
     greeting: {
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: 'bold',
       color: colors.text,
+      textTransform: 'capitalize',
     },
     greetingSubtitle: {
       fontSize: 13,
       color: colors.textSecondary,
       marginTop: 2,
     },
-    // Stats em Flexbox row
     statsRow: {
       flexDirection: 'row',
       gap: 10,
@@ -203,7 +193,7 @@ const createStyles = (colors) =>
       alignItems: 'center',
     },
     statNumber: {
-      fontSize: 22,
+      fontSize: 20,
       fontWeight: 'bold',
     },
     statLabel: {
@@ -211,7 +201,6 @@ const createStyles = (colors) =>
       fontWeight: '600',
       marginTop: 2,
     },
-    // ─── Busca ───
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -230,7 +219,6 @@ const createStyles = (colors) =>
       fontSize: 15,
       color: colors.text,
     },
-    // ─── Filtros ───
     filterRow: {
       flexDirection: 'row',
       paddingHorizontal: 16,
@@ -264,12 +252,10 @@ const createStyles = (colors) =>
       paddingHorizontal: 20,
       paddingTop: 10,
     },
-    // ─── Lista ───
     listContent: {
       padding: 16,
-      paddingBottom: 100, // espaço para o FAB não sobrepor o último card
+      paddingBottom: 100,
     },
-    // ─── FAB ───
     fab: {
       position: 'absolute',
       bottom: 24,

@@ -1,16 +1,18 @@
 /**
- * AppNavigator.js — Configuração completa de navegação.
+ * AppNavigator.js — Configuração completa de navegação (atualizada para o habit tracker).
  *
  * Estrutura:
- *  AuthStack      → Login, Register (para usuários não autenticados)
- *  MainTabNavigator → Abas inferiores com:
- *    HomeStack    → Home → AddTask → TaskDetail (Stack Navigator)
- *    SettingsStack → Settings (Stack Navigator)
+ *  AuthStack         → Login, Register (sem header)
+ *  MainTabNavigator  → Três abas:
+ *    DashboardStack  → DashboardScreen
+ *    HomeStack       → HomeScreen → AddHabit → HabitDetail
+ *    SettingsStack   → SettingsScreen
  *
- * O navegador raiz troca automaticamente entre AuthStack e MainTabNavigator
- * com base no estado do usuário (user !== null).
+ * Por que dois navigators (Stack + Tab)?
+ *  - Tab Navigator cuida das abas principais (Dashboard, Hoje, Config)
+ *  - Stack Navigator dentro de cada aba cuida da navegação em profundidade
+ *    (ex: Hoje → Detalhe do hábito → Editar hábito)
  */
-import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -22,19 +24,40 @@ import { getTheme } from '../utils/themes';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import DashboardScreen from '../screens/DashboardScreen';
 import HomeScreen from '../screens/HomeScreen';
-import AddTaskScreen from '../screens/AddTaskScreen';
-import TaskDetailScreen from '../screens/TaskDetailScreen';
+import AddTaskScreen from '../screens/AddTaskScreen';     // conteúdo: AddHabit
+import TaskDetailScreen from '../screens/TaskDetailScreen'; // conteúdo: HabitDetail
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Stack de navegação para a aba "Início"
+// Stack da aba "Dashboard" (tela única por ora — sem sub-navegação)
+function DashboardStack() {
+  const { theme } = useApp();
+  const colors = getTheme(theme);
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.headerBg },
+        headerTintColor: colors.headerText,
+        headerTitleStyle: { fontWeight: 'bold', fontSize: 17 },
+      }}
+    >
+      <Stack.Screen
+        name="DashboardMain"
+        component={DashboardScreen}
+        options={{ title: 'Dashboard' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Stack da aba "Hoje" — inclui AddHabit e HabitDetail
 function HomeStack() {
   const { theme } = useApp();
   const colors = getTheme(theme);
-
   return (
     <Stack.Navigator
       screenOptions={{
@@ -46,27 +69,26 @@ function HomeStack() {
       <Stack.Screen
         name="Home"
         component={HomeScreen}
-        options={{ title: 'Minhas Tarefas' }}
+        options={{ title: 'Meus Hábitos' }}
       />
       <Stack.Screen
-        name="AddTask"
+        name="AddHabit"
         component={AddTaskScreen}
-        options={{ title: 'Nova Tarefa' }}
+        options={{ title: 'Novo Hábito' }}
       />
       <Stack.Screen
-        name="TaskDetail"
+        name="HabitDetail"
         component={TaskDetailScreen}
-        options={{ title: 'Detalhes da Tarefa' }}
+        options={{ title: 'Detalhes do Hábito' }}
       />
     </Stack.Navigator>
   );
 }
 
-// Stack de navegação para a aba "Configurações"
+// Stack da aba "Configurações"
 function SettingsStack() {
   const { theme } = useApp();
   const colors = getTheme(theme);
-
   return (
     <Stack.Navigator
       screenOptions={{
@@ -84,7 +106,7 @@ function SettingsStack() {
   );
 }
 
-// Navegador de abas inferiores (exibido após o login)
+// Tab Navigator principal (pós-login)
 function MainTabNavigator() {
   const { theme } = useApp();
   const colors = getTheme(theme);
@@ -92,10 +114,11 @@ function MainTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        // Ícone de cada aba varia conforme o foco
+        // Ícone muda conforme o foco da aba
         tabBarIcon: ({ focused, color, size }) => {
           const icons = {
-            Início: focused ? 'home' : 'home-outline',
+            Dashboard: focused ? 'grid' : 'grid-outline',
+            Hoje: focused ? 'today' : 'today-outline',
             Configurações: focused ? 'settings' : 'settings-outline',
           };
           return <Ionicons name={icons[route.name]} size={size} color={color} />;
@@ -108,17 +131,18 @@ function MainTabNavigator() {
           paddingBottom: 6,
           height: 62,
         },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-        headerShown: false, // cada stack filho cuida do próprio header
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        headerShown: false, // cada Stack filho gerencia seu próprio header
       })}
     >
-      <Tab.Screen name="Início" component={HomeStack} />
+      <Tab.Screen name="Dashboard" component={DashboardStack} />
+      <Tab.Screen name="Hoje" component={HomeStack} />
       <Tab.Screen name="Configurações" component={SettingsStack} />
     </Tab.Navigator>
   );
 }
 
-// Stack de autenticação (Login e Cadastro)
+// Stack de autenticação (sem header, telas controlam o layout)
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -128,22 +152,14 @@ function AuthStack() {
   );
 }
 
-// Navegador raiz: exibe AuthStack ou MainTabNavigator conforme o estado do login
+// Navegador raiz: exibe AuthStack ou App conforme o estado de login
 export default function AppNavigator() {
   const { user, loading, theme } = useApp();
   const colors = getTheme(theme);
 
-  // Enquanto o AsyncStorage carrega os dados, exibe um indicador de carregamento
   if (loading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: colors.background,
-        }}
-      >
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
