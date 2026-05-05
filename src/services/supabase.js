@@ -1,14 +1,24 @@
 /**
- * supabase.js — Configuração do cliente Supabase.
+ * supabase.js — Configuração da conexão com o banco de dados na nuvem.
  *
- * ATENÇÃO: substitua os valores abaixo com os da sua conta Supabase.
- * Acesse: https://supabase.com → seu projeto → Settings → API
+ * O Supabase é um serviço de banco de dados online (na nuvem). Em vez de
+ * salvar os dados dos usuários só no aparelho, agora eles ficam salvos num
+ * servidor, o que significa que:
+ *  - O usuário não perde os dados se desinstalar o app
+ *  - Dá pra acessar de qualquer aparelho
+ *  - Várias pessoas podem ter contas separadas com dados independentes
  *
- * SUPABASE_URL  → "Project URL"
- * SUPABASE_ANON_KEY → "Project API Keys" → anon public
+ * Aqui eu crio a "conexão" com o banco. É como configurar o endereço de
+ * um servidor antes de começar a mandar e receber informações.
  *
- * A chave anon é segura para ficar no código-fonte do cliente porque
- * o acesso aos dados é controlado pelas políticas RLS no Supabase.
+ * As duas informações necessárias são:
+ *  - SUPABASE_URL: o endereço do servidor (como o endereço de um site)
+ *  - SUPABASE_ANON_KEY: uma chave pública que identifica meu aplicativo
+ *
+ * A chave anon (anônima) é segura para ficar no código-fonte porque
+ * ela sozinha não dá acesso a nada — só funciona com o usuário logado,
+ * e as regras do banco (chamadas RLS) garantem que cada pessoa só vê
+ * os próprios dados.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
@@ -18,9 +28,11 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage: AsyncStorage,       // persiste a sessão no dispositivo
-    autoRefreshToken: true,      // renova o token automaticamente
-    persistSession: true,        // mantém o login entre aberturas do app
-    detectSessionInUrl: false,   // necessário para React Native (sem URL)
+    // Uso o AsyncStorage para salvar a sessão do usuário no aparelho.
+    // Assim ele não precisa fazer login toda vez que abrir o app.
+    storage: AsyncStorage,
+    autoRefreshToken: true,   // renova o "passe de acesso" automaticamente antes de vencer
+    persistSession: true,     // mantém o usuário logado mesmo fechando o app
+    detectSessionInUrl: false, // desativo essa opção porque no React Native não tem URL de navegador
   },
 });
