@@ -1,197 +1,107 @@
 /**
- * AppContext.js — Estado global da aplicação (hábitos, autenticação e tema).
+ * AppContext.js — Estado global da aplicação com Supabase.
  *
- * Usei a Context API do React para disponibilizar o estado global para todas
- * as telas sem precisar passar props manualmente de componente em componente.
+ * Autenticação e dados de hábitos agora são gerenciados pelo Supabase:
+ *  - Auth: email/senha real com sessão persistida no dispositivo
+ *  - Banco: tabela "habits" com Row Level Security (cada usuário vê só os seus)
+ *  - Tema: ainda salvo localmente no AsyncStorage (preferência do dispositivo)
  *
- * O que fica nesse contexto:
- *  - user: dados do usuário logado (nome, email — sem senha)
- *  - habits: lista de todos os hábitos do usuário
- *  - theme: 'light' ou 'dark'
- *  - Funções: login, register, logout, addHabit, updateHabit, deleteHabit,
- *             toggleHabitToday, toggleTheme
- *
- * Modelo de um hábito:
- *  {
- *    id: string,            → identificador único (timestamp)
- *    name: string,          → nome do hábito (ex: "Beber água")
- *    description: string,   → descrição opcional
- *    icon: string,          → emoji (ex: "💧")
- *    color: string,         → cor hex (ex: "#45B7D1")
- *    createdAt: string,     → data de criação em formato ISO
- *    history: {             → registro diário de conclusões
- *      'YYYY-MM-DD': boolean
- *    }
- *  }
- *
- * Segurança implementada:
- *  - Senhas NUNCA são salvas no AsyncStorage
- *  - Todos os inputs passam pela validação do security.js antes de persistir
- *  - As chaves do AsyncStorage têm prefixo 'v2' para não conflitar com versões antigas
+ * A interface pública do contexto (funções e estado) não mudou,
+ * então nenhuma tela precisa ser alterada.
  */
 import { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../services/supabase';
 import { DateUtils } from '../utils/dateUtils';
 import { Security } from '../utils/security';
 
-// Cria o contexto vazio — o valor real é passado pelo AppProvider
 const AppContext = createContext({});
 
-// Usuários de demonstração para facilitar o teste do app
-const DEMO_USERS = [
-  { id: '1', name: 'João Silva', email: 'joao@email.com', password: '123456' },
-  { id: '2', name: 'Maria Souza', email: 'maria@email.com', password: '123456' },
-];
+const THEME_KEY = '@appRotina:theme';
 
-// Função auxiliar para gerar chave de data N dias atrás
-// Precisa estar antes do INITIAL_HABITS porque ele usa essa função
-function d(n) {
-  return DateUtils.daysAgoKey(n);
+// Converte o objeto do Supabase Auth para o formato que o app usa
+function mapSupabaseUser(supabaseUser) {
+  return {
+    id: supabaseUser.id,
+    name: supabaseUser.user_metadata?.name || supabaseUser.email.split('@')[0],
+    email: supabaseUser.email,
+  };
 }
 
-// Hábitos de exemplo carregados na primeira execução do app
-// Já vêm com histórico pré-populado para o Dashboard ter dados para exibir
-const INITIAL_HABITS = [
-  {
-    id: '1',
-    name: 'Beber 2L de água',
-    description: 'Manter hidratação ao longo do dia',
-    icon: '💧',
-    color: '#45B7D1',
-    createdAt: new Date(Date.now() - 14 * 864e5).toISOString(),
-    history: {
-      [d(6)]: true, [d(5)]: true, [d(4)]: true,
-      [d(3)]: false, [d(2)]: true, [d(1)]: true,
-    },
-  },
-  {
-    id: '2',
-    name: 'Meditação matinal',
-    description: '10 minutos ao acordar',
-    icon: '🧘',
-    color: '#DDA0DD',
-    createdAt: new Date(Date.now() - 10 * 864e5).toISOString(),
-    history: {
-      [d(5)]: true, [d(4)]: true,
-      [d(3)]: true, [d(2)]: true, [d(1)]: true,
-    },
-  },
-  {
-    id: '3',
-    name: 'Leitura diária',
-    description: 'Ler pelo menos 20 páginas',
-    icon: '📚',
-    color: '#FF6B6B',
-    createdAt: new Date(Date.now() - 20 * 864e5).toISOString(),
-    history: {
-      [d(6)]: true, [d(5)]: false, [d(4)]: true,
-      [d(3)]: true, [d(2)]: false, [d(1)]: true,
-    },
-  },
-  {
-    id: '4',
-    name: 'Exercício físico',
-    description: '30 minutos de atividade',
-    icon: '🏃',
-    color: '#4ECDC4',
-    createdAt: new Date(Date.now() - 5 * 864e5).toISOString(),
-    history: {
-      [d(4)]: true, [d(3)]: true,
-      [d(2)]: true, [d(1)]: false,
-    },
-  },
-];
+// Converte a linha do banco para o formato que o app usa (snake_case → camelCase)
+function mapHabit(row) {
+  return {
+    ...row,
+    createdAt: row.created_at,
+  };
+}
 
-// Chaves do AsyncStorage com prefixo 'v2' para não conflitar com versões antigas
-const KEYS = {
-  USER: '@appRotina:v2:user',
-  HABITS: '@appRotina:v2:habits',
-  THEME: '@appRotina:v2:theme',
-  USERS: '@appRotina:v2:users',
-};
-
-// AppProvider: componente que envolve todo o app e fornece o estado global
 export function AppProvider({ children }) {
-  const [user, setUser] = useState(null);       // usuário logado (ou null)
-  const [habits, setHabits] = useState([]);      // lista de hábitos
-  const [theme, setTheme] = useState('light');   // tema atual
-  const [loading, setLoading] = useState(true);  // carregando dados do storage
-  const [users, setUsers] = useState(DEMO_USERS); // base de usuários (demo)
+  const [user, setUser] = useState(null);
+  const [habits, setHabits] = useState([]);
+  const [theme, setTheme] = useState('light');
+  const [loading, setLoading] = useState(true);
 
-  // Ao abrir o app, carrega os dados salvos no AsyncStorage
+  // Ao abrir o app: carrega tema local e verifica sessão existente no Supabase
   useEffect(() => {
-    loadStoredData();
+    AsyncStorage.getItem(THEME_KEY).then((t) => { if (t) setTheme(t); });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(mapSupabaseUser(session.user));
+        loadHabits(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Ouve mudanças de autenticação (login, logout, expiração de sessão)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setHabits([]);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  /**
-   * Carrega todos os dados persistidos de uma vez usando Promise.all.
-   * Isso é mais eficiente do que fazer uma leitura de cada vez.
-   */
-  const loadStoredData = async () => {
-    try {
-      const [storedUser, storedHabits, storedTheme, storedUsers] = await Promise.all([
-        AsyncStorage.getItem(KEYS.USER),
-        AsyncStorage.getItem(KEYS.HABITS),
-        AsyncStorage.getItem(KEYS.THEME),
-        AsyncStorage.getItem(KEYS.USERS),
-      ]);
+  // Busca todos os hábitos do usuário no Supabase
+  const loadHabits = async (userId) => {
+    const { data, error } = await supabase
+      .from('habits')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-      if (storedUser) setUser(JSON.parse(storedUser));
-      // Se não há hábitos salvos (primeira execução), usa os exemplos
-      if (storedHabits) setHabits(JSON.parse(storedHabits));
-      else setHabits(INITIAL_HABITS);
-      if (storedTheme) setTheme(storedTheme);
-      if (storedUsers) setUsers(JSON.parse(storedUsers));
-    } catch (error) {
-      Security.safeLog({ context: 'loadStoredData', error: error.message });
-      setHabits(INITIAL_HABITS); // fallback seguro em caso de erro
-    } finally {
-      setLoading(false); // libera a tela de loading independente do resultado
+    if (!error && data) {
+      setHabits(data.map(mapHabit));
     }
-  };
-
-  // Salva o array de hábitos no AsyncStorage após qualquer modificação
-  const persistHabits = async (newHabits) => {
-    try {
-      await AsyncStorage.setItem(KEYS.HABITS, JSON.stringify(newHabits));
-    } catch (error) {
-      Security.safeLog({ context: 'persistHabits', error: error.message });
-    }
+    setLoading(false);
   };
 
   // ─── AUTENTICAÇÃO ─────────────────────────────────────────────────────────
 
-  /**
-   * Login: valida o email e busca o usuário na lista.
-   * A mensagem de erro é genérica para não revelar se o problema
-   * está no email ou na senha (boa prática de segurança).
-   */
   const login = async (email, password) => {
     if (!Security.validateEmail(email)) {
       return { success: false, message: 'Formato de email inválido.' };
     }
 
-    const found = users.find(
-      (u) => u.email === email.toLowerCase().trim() && u.password === password
-    );
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase().trim(),
+      password,
+    });
 
-    if (found) {
-      // Salvo só os dados não-sensíveis — a senha nunca vai para o AsyncStorage
-      const userData = { id: found.id, name: found.name, email: found.email };
-      setUser(userData);
-      await AsyncStorage.setItem(KEYS.USER, JSON.stringify(userData));
-      return { success: true };
-    }
+    if (error) return { success: false, message: 'Email ou senha incorretos.' };
 
-    return { success: false, message: 'Email ou senha incorretos.' };
+    const userData = mapSupabaseUser(data.user);
+    setUser(userData);
+    await loadHabits(data.user.id);
+    return { success: true };
   };
 
-  /**
-   * Cadastro: valida todos os campos com o security.js e cria o novo usuário.
-   * Em um app real de produção, isso seria feito no backend com hash de senha.
-   */
   const register = async (name, email, password) => {
-    // Valida cada campo individualmente para poder dar mensagens de erro específicas
     const nameV = Security.validateName(name);
     if (!nameV.valid) return { success: false, message: nameV.message };
 
@@ -202,64 +112,63 @@ export function AppProvider({ children }) {
     const passV = Security.validatePassword(password);
     if (!passV.valid) return { success: false, message: passV.message };
 
-    const emailLower = email.toLowerCase().trim();
-    if (users.find((u) => u.email === emailLower)) {
-      return { success: false, message: 'Este email já está cadastrado.' };
+    const { data, error } = await supabase.auth.signUp({
+      email: email.toLowerCase().trim(),
+      password,
+      options: { data: { name: nameV.value } },
+    });
+
+    if (error) {
+      if (error.message.toLowerCase().includes('already registered')) {
+        return { success: false, message: 'Este email já está cadastrado.' };
+      }
+      return { success: false, message: error.message };
     }
 
-    const newUser = { id: Date.now().toString(), name: nameV.value, email: emailLower, password };
-    const updatedUsers = [...users, newUser];
-    setUsers(updatedUsers);
-    await AsyncStorage.setItem(KEYS.USERS, JSON.stringify(updatedUsers));
-
-    // Loga automaticamente após o cadastro
-    const userData = { id: newUser.id, name: newUser.name, email: newUser.email };
+    const userData = { id: data.user.id, name: nameV.value, email: data.user.email };
     setUser(userData);
-    await AsyncStorage.setItem(KEYS.USER, JSON.stringify(userData));
+
+    // Insere hábitos de exemplo para o novo usuário ter dados para ver
+    await seedDemoHabits(data.user.id);
+    await loadHabits(data.user.id);
     return { success: true };
   };
 
-  // Remove o usuário do estado e do storage (os hábitos permanecem)
   const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    await AsyncStorage.removeItem(KEYS.USER);
+    setHabits([]);
   };
 
   // ─── CRUD DE HÁBITOS ──────────────────────────────────────────────────────
 
-  /**
-   * Cria um novo hábito após validar e sanitizar todos os campos.
-   * A cor e o ícone passam por validação adicional para garantir que
-   * apenas valores seguros sejam aplicados nos estilos.
-   */
   const addHabit = async (habitData) => {
     const nameV = Security.validateHabitName(habitData.name);
     if (!nameV.valid) return { success: false, message: nameV.message };
 
-    // Se a cor ou o ícone forem inválidos, usa um valor padrão seguro
     const safeColor = Security.isValidHexColor(habitData.color) ? habitData.color : '#6C63FF';
     const safeIcon = Security.isValidIcon(habitData.icon) ? habitData.icon : '📋';
 
-    const newHabit = {
-      id: Date.now().toString(),
-      name: nameV.value,
-      description: Security.sanitizeDescription(habitData.description),
-      icon: safeIcon,
-      color: safeColor,
-      createdAt: new Date().toISOString(),
-      history: {}, // histórico vazio — o usuário começa a marcar a partir de hoje
-    };
+    const { data, error } = await supabase
+      .from('habits')
+      .insert({
+        user_id: user.id,
+        name: nameV.value,
+        description: Security.sanitizeDescription(habitData.description),
+        icon: safeIcon,
+        color: safeColor,
+        history: {},
+      })
+      .select()
+      .single();
 
-    const updatedHabits = [newHabit, ...habits]; // novo hábito aparece no topo
-    setHabits(updatedHabits);
-    await persistHabits(updatedHabits);
+    if (error) return { success: false, message: 'Erro ao criar hábito. Tente novamente.' };
+
+    const newHabit = mapHabit(data);
+    setHabits([newHabit, ...habits]);
     return { success: true, habit: newHabit };
   };
 
-  /**
-   * Atualiza um hábito existente.
-   * Só valida e atualiza os campos que foram passados (updates parciais).
-   */
   const updateHabit = async (id, updates) => {
     const sanitizedUpdates = {};
 
@@ -278,64 +187,74 @@ export function AppProvider({ children }) {
       sanitizedUpdates.color = updates.color;
     }
 
-    // Cria novo array com o hábito atualizado (imutabilidade)
-    const updatedHabits = habits.map((h) =>
-      h.id === id ? { ...h, ...sanitizedUpdates } : h
-    );
-    setHabits(updatedHabits);
-    await persistHabits(updatedHabits);
+    const { error } = await supabase.from('habits').update(sanitizedUpdates).eq('id', id);
+    if (error) return { success: false, message: 'Erro ao atualizar hábito.' };
+
+    setHabits(habits.map((h) => (h.id === id ? { ...h, ...sanitizedUpdates } : h)));
     return { success: true };
   };
 
-  // Remove o hábito e todo o seu histórico permanentemente
   const deleteHabit = async (id) => {
-    const updatedHabits = habits.filter((h) => h.id !== id);
-    setHabits(updatedHabits);
-    await persistHabits(updatedHabits);
+    await supabase.from('habits').delete().eq('id', id);
+    setHabits(habits.filter((h) => h.id !== id));
   };
 
-  /**
-   * Marca ou desmarca o hábito como concluído no dia atual.
-   * Funciona como toggle: se já estava feito, desfaz; se não estava, marca.
-   *
-   * Usei imutabilidade aqui: crio um novo objeto history em vez de
-   * modificar o existente, o que é a forma correta de atualizar estado no React.
-   */
   const toggleHabitToday = async (id) => {
     const today = DateUtils.todayKey();
-    const updatedHabits = habits.map((h) => {
-      if (h.id !== id) return h;
-      const wasCompleted = h.history[today] === true;
-      const newHistory = { ...h.history, [today]: !wasCompleted };
-      return { ...h, history: newHistory };
-    });
-    setHabits(updatedHabits);
-    await persistHabits(updatedHabits);
+    const habit = habits.find((h) => h.id === id);
+    if (!habit) return;
+
+    const newHistory = { ...habit.history, [today]: !habit.history[today] };
+    await supabase.from('habits').update({ history: newHistory }).eq('id', id);
+    setHabits(habits.map((h) => (h.id === id ? { ...h, history: newHistory } : h)));
   };
 
   // ─── TEMA ──────────────────────────────────────────────────────────────────
 
-  // Alterna entre tema claro e escuro e persiste a preferência
   const toggleTheme = async () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    await AsyncStorage.setItem(KEYS.THEME, newTheme);
+    await AsyncStorage.setItem(THEME_KEY, newTheme);
+  };
+
+  // ─── SEED DE DADOS ─────────────────────────────────────────────────────────
+
+  // Insere hábitos de demonstração para que novos usuários já tenham dados para ver
+  const seedDemoHabits = async (userId) => {
+    function d(n) { return DateUtils.daysAgoKey(n); }
+
+    const demos = [
+      {
+        user_id: userId, name: 'Beber 2L de água',
+        description: 'Manter hidratação ao longo do dia', icon: '💧', color: '#45B7D1',
+        history: { [d(6)]: true, [d(5)]: true, [d(4)]: true, [d(3)]: false, [d(2)]: true, [d(1)]: true },
+      },
+      {
+        user_id: userId, name: 'Meditação matinal',
+        description: '10 minutos ao acordar', icon: '🧘', color: '#DDA0DD',
+        history: { [d(5)]: true, [d(4)]: true, [d(3)]: true, [d(2)]: true, [d(1)]: true },
+      },
+      {
+        user_id: userId, name: 'Leitura diária',
+        description: 'Ler pelo menos 20 páginas', icon: '📚', color: '#FF6B6B',
+        history: { [d(6)]: true, [d(5)]: false, [d(4)]: true, [d(3)]: true, [d(2)]: false, [d(1)]: true },
+      },
+      {
+        user_id: userId, name: 'Exercício físico',
+        description: '30 minutos de atividade', icon: '🏃', color: '#4ECDC4',
+        history: { [d(4)]: true, [d(3)]: true, [d(2)]: true, [d(1)]: false },
+      },
+    ];
+
+    await supabase.from('habits').insert(demos);
   };
 
   return (
     <AppContext.Provider
       value={{
-        user,
-        habits,
-        theme,
-        loading,
-        login,
-        register,
-        logout,
-        addHabit,
-        updateHabit,
-        deleteHabit,
-        toggleHabitToday,
+        user, habits, theme, loading,
+        login, register, logout,
+        addHabit, updateHabit, deleteHabit, toggleHabitToday,
         toggleTheme,
       }}
     >
@@ -344,11 +263,6 @@ export function AppProvider({ children }) {
   );
 }
 
-/**
- * Hook personalizado para acessar o contexto global.
- * Em vez de importar AppContext e useContext em cada tela,
- * basta importar esse hook: const { habits, theme } = useApp();
- */
 export function useApp() {
   return useContext(AppContext);
 }
