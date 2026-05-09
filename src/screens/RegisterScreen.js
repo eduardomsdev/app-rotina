@@ -92,7 +92,7 @@ export default function RegisterScreen({ navigation }) {
 
           <View style={styles.titleArea}>
             <Text style={styles.title}>Criar Conta</Text>
-            <Text style={styles.subtitle}>Junte-se ao AppRotina hoje mesmo!</Text>
+            <Text style={styles.subtitle}>Junte-se ao MS Productivity hoje mesmo!</Text>
           </View>
         </View>
 

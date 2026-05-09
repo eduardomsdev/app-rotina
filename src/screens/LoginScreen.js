@@ -81,16 +81,16 @@ export default function LoginScreen({ navigation }) {
         {/* ─── Logo do aplicativo (componente Image — requisito acadêmico) ─── */}
         <View style={styles.logoContainer}>
           {/*
-            Image: exibe o ícone do app usando uma URL externa.
-            Em um app de produção, o logo estaria nos assets locais.
-            Para este trabalho, usei uma URL de ícone público para simplificar.
+            Image: exibe a logo do app a partir de um arquivo local.
+            Uso o require() porque a imagem fica dentro do projeto, em src/assets/.
+            Isso garante que a logo carregue na hora, mesmo sem internet.
           */}
           <Image
-            source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2098/2098402.png' }}
+            source={require('../assets/logo.webp')}
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.appName}>AppRotina</Text>
+          <Text style={styles.appName}>MS Productivity</Text>
           <Text style={styles.appSubtitle}>Organize sua vida, uma tarefa por vez</Text>
         </View>
 

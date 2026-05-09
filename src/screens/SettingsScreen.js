@@ -227,7 +227,7 @@ export default function SettingsScreen() {
 
       {/* Rodapé com créditos */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>AppRotina © 2025</Text>
+        <Text style={styles.footerText}>MS Productivity © 2025</Text>
         <Text style={styles.footerText}>Feito com React Native + Expo</Text>
       </View>
     </ScrollView>

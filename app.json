@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "AppRotina",
-    "slug": "app-rotina",
+    "name": "MS Productivity",
+    "slug": "ms-productivity",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
     "orientation": "portrait",
@@ -15,14 +15,14 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.appRotina.app"
+      "bundleIdentifier": "com.msproductivity.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#6C63FF"
       },
-      "package": "com.appRotina.app"
+      "package": "com.msproductivity.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -117,7 +117,7 @@ export const Security = {
       if (safe.password) safe.password = '[REDACTED]';
       if (safe.token) safe.token = '[REDACTED]';
       if (safe.secret) safe.secret = '[REDACTED]';
-      console.log('[AppRotina Debug]', safe);
+      console.log('[MS Productivity Debug]', safe);
     }
     // Em produção não loga nada — evita vazar dados no console
   },
