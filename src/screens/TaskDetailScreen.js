@@ -28,13 +28,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { getTheme } from '../utils/themes';
 import { HabitService } from '../services/habitService';
 import { DateUtils } from '../utils/dateUtils';
+import AppModal from '../components/AppModal';
 
 // Mesmos ícones e cores disponíveis na tela de criação
 const HABIT_ICONS = [
@@ -64,6 +64,9 @@ export default function TaskDetailScreen({ route, navigation }) {
   const [description, setDescription] = useState(habit?.description || '');
   const [icon, setIcon] = useState(habit?.icon || '📋');
   const [selectedColor, setSelectedColor] = useState(habit?.color || '#6C63FF');
+  const [modal, setModal] = useState({ visible: false });
+  const showModal = (config) => setModal({ visible: true, ...config });
+  const hideModal = () => setModal({ visible: false });
 
   /**
    * Adiciona o botão de editar/cancelar no cabeçalho da tela dinamicamente.
@@ -128,29 +131,25 @@ export default function TaskDetailScreen({ route, navigation }) {
     });
     if (result.success) {
       setEditing(false);
-      Alert.alert('✅ Salvo!', 'Hábito atualizado com sucesso.');
+      showModal({ title: '✅ Salvo!', message: 'Hábito atualizado com sucesso.', confirmText: 'OK', onConfirm: hideModal });
     } else {
-      Alert.alert('Erro', result.message);
+      showModal({ title: 'Erro', message: result.message, confirmText: 'OK', onConfirm: hideModal });
     }
   };
 
   const handleDelete = () => {
-    // Confirmação antes de excluir — ação irreversível
-    Alert.alert(
-      'Excluir Hábito',
-      `Excluir "${habit.name}" permanentemente? Todo o histórico será perdido.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteHabit(habitId);
-            navigation.goBack();
-          },
-        },
-      ]
-    );
+    showModal({
+      title: 'Excluir Hábito',
+      message: `Excluir "${habit.name}" permanentemente? Todo o histórico será perdido.`,
+      confirmText: 'Excluir',
+      danger: true,
+      onConfirm: async () => {
+        hideModal();
+        await deleteHabit(habitId);
+        navigation.goBack();
+      },
+      onCancel: hideModal,
+    });
   };
 
   const styles = createStyles(colors);
@@ -375,6 +374,17 @@ export default function TaskDetailScreen({ route, navigation }) {
           <Text style={styles.deleteButtonText}>Excluir Hábito</Text>
         </TouchableOpacity>
       )}
+      {/* Modal de confirmação/alerta (delete, save, erros) */}
+      <AppModal
+        visible={modal.visible}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.confirmText}
+        danger={modal.danger}
+        onConfirm={modal.onConfirm}
+        onCancel={modal.onCancel}
+        colors={colors}
+      />
     </ScrollView>
   );
 }

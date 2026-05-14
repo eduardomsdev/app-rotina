@@ -31,7 +31,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Button,
@@ -39,6 +38,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { getTheme } from '../utils/themes';
+import AppModal from '../components/AppModal';
 
 // Grade de emojis disponíveis para o ícone do hábito
 const HABIT_ICONS = [
@@ -65,6 +65,9 @@ export default function AddTaskScreen({ navigation }) {
   const [selectedIcon, setSelectedIcon] = useState('💧');
   const [selectedColor, setSelectedColor] = useState('#45B7D1');
   const [loading, setLoading] = useState(false);
+  const [modal, setModal] = useState({ visible: false });
+  const showModal = (config) => setModal({ visible: true, ...config });
+  const hideModal = () => setModal({ visible: false });
 
   // Limpa todos os campos voltando para os valores padrão
   const handleClear = () => {
@@ -75,9 +78,13 @@ export default function AddTaskScreen({ navigation }) {
   };
 
   const handleSave = async () => {
-    // Validação local antes de chamar o contexto
     if (!name.trim()) {
-      Alert.alert('Campo obrigatório', 'Informe um nome para o hábito.');
+      showModal({
+        title: 'Campo obrigatório',
+        message: 'Informe um nome para o hábito.',
+        confirmText: 'OK',
+        onConfirm: hideModal,
+      });
       return;
     }
 
@@ -91,14 +98,17 @@ export default function AddTaskScreen({ navigation }) {
     setLoading(false);
 
     if (!result.success) {
-      Alert.alert('Erro', result.message);
+      showModal({ title: 'Erro', message: result.message, confirmText: 'OK', onConfirm: hideModal });
       return;
     }
 
-    // Avisa o sucesso e volta para a lista
-    Alert.alert('✅ Hábito criado!', `"${name.trim()}" foi adicionado à sua rotina.`, [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+    // Mostra confirmação visual dentro do app antes de voltar
+    showModal({
+      title: '✅ Hábito criado!',
+      message: `"${name.trim()}" foi adicionado à sua rotina.`,
+      confirmText: 'Ver lista',
+      onConfirm: () => { hideModal(); navigation.goBack(); },
+    });
   };
 
   const styles = createStyles(colors);
@@ -253,6 +263,17 @@ export default function AddTaskScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Modal de confirmação/alerta (campo vazio, erro, sucesso) */}
+      <AppModal
+        visible={modal.visible}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.confirmText}
+        onConfirm={modal.onConfirm}
+        onCancel={modal.onCancel}
+        colors={colors}
+      />
     </KeyboardAvoidingView>
   );
 }

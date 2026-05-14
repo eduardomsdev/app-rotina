@@ -28,16 +28,18 @@ import {
   ScrollView,
   Switch,
   Image,
-  Alert,
 } from 'react-native';
+import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { getTheme } from '../utils/themes';
 import { DateUtils } from '../utils/dateUtils';
+import AppModal from '../components/AppModal';
 
 export default function SettingsScreen() {
   const { user, logout, theme, toggleTheme, habits } = useApp();
   const colors = getTheme(theme);
+  const [logoutModal, setLogoutModal] = useState(false);
 
   // Calcula o progresso de hoje para a barra de progresso
   const today = DateUtils.todayKey();
@@ -45,17 +47,7 @@ export default function SettingsScreen() {
   const totalCount = habits.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  const handleLogout = () => {
-    // Pede confirmação antes de fazer logout (ação que pode causar perda de contexto)
-    Alert.alert(
-      'Sair da Conta',
-      'Deseja realmente sair? Seus dados ficam salvos para o próximo acesso.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sair', style: 'destructive', onPress: logout },
-      ]
-    );
-  };
+  const handleLogout = () => setLogoutModal(true);
 
   const styles = createStyles(colors);
 
@@ -230,6 +222,19 @@ export default function SettingsScreen() {
         <Text style={styles.footerText}>MS Productivity © 2025</Text>
         <Text style={styles.footerText}>Feito com React Native + Expo</Text>
       </View>
+
+      {/* Modal de confirmação de logout */}
+      <AppModal
+        visible={logoutModal}
+        title="Sair da Conta"
+        message="Deseja realmente sair? Seus dados ficam salvos para o próximo acesso."
+        confirmText="Sair"
+        cancelText="Cancelar"
+        danger
+        onConfirm={() => { setLogoutModal(false); logout(); }}
+        onCancel={() => setLogoutModal(false)}
+        colors={colors}
+      />
     </ScrollView>
   );
 }
