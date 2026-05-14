@@ -3,7 +3,6 @@
     "name": "MS Productivity",
     "slug": "ms-productivity",
     "version": "1.0.0",
-    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -33,6 +32,9 @@
       "eas": {
         "projectId": "4c938d97-33bd-4b5d-854e-2532334bf405"
       }
-    }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }
