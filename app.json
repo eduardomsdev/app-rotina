@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#6C63FF"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.msproductivity.app"
@@ -26,6 +28,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4c938d97-33bd-4b5d-854e-2532334bf405"
+      }
     }
   }
 }
